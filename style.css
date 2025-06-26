@@ -1,65 +1,30 @@
-body {
-  font-family: sans-serif;
-  padding: 1rem;
-}
+/* ...existing styles above... */
 
-#controls {
-  margin-bottom: 1rem;
-}
-
-input[type="text"] {
-  width: 80%;
-  padding: 0.5rem;
+#status {
+  margin: 1rem 0;
   font-size: 1rem;
-}
-
-button {
-  padding: 0.5rem 1rem;
-  font-size: 1rem;
-}
-
-.sheet {
+  color: #ccc;
   display: flex;
-  flex-wrap: wrap;
-  gap: 5mm;
   justify-content: center;
+  align-items: center;
+  gap: 1rem;
 }
 
-.card {
-  width: 63mm;
-  height: 88mm;
-  object-fit: cover;
-  box-shadow: 0 0 2mm rgba(0, 0, 0, 0.3);
-}
-
-@media print {
-  #controls {
-    display: none;
-  }
-
-  .sheet {
-    page-break-after: always;
-    padding: 0;
-    margin: 0;
-  }
-}
 .spinner {
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #555;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top: 4px solid #61dafb;
   border-radius: 50%;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   animation: spin 1s linear infinite;
-  margin: 1rem auto;
+}
+
+.hidden {
+  display: none;
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  to {
+    transform: rotate(360deg);
+  }
 }

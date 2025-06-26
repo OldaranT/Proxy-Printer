@@ -2,20 +2,29 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MTG Proxy Printer</title>
-  <link rel="stylesheet" href="style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MTG Proxy Deck Viewer</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <h1>MTG Proxy Deck Viewer</h1>
 
-  <div id="controls">
-    <input type="text" id="deckUrl" placeholder="Paste Archidekt deck URL here" />
-    <button>Load Deck</button>
+  <div class="input-group">
+    <input
+      type="text"
+      id="deckUrl"
+      placeholder="Paste your Archidekt deck URL here..."
+    />
+    <button id="loadButton">Load Deck</button>
   </div>
 
-  <div class="sheet" id="sheet"></div>
+  <div id="status">
+    <div class="spinner hidden" id="spinner"></div>
+    <p id="statusText"></p>
+  </div>
 
-  <!-- ✅ This must be the only JS tag -->
+  <div id="sheet" class="card-container"></div>
+
   <script src="script.js"></script>
 </body>
 </html>
