@@ -4,113 +4,20 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>MTG Proxy Printer</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      padding: 1rem;
-    }
-
-    #controls {
-      margin-bottom: 1rem;
-    }
-
-    input[type="text"] {
-      width: 80%;
-      padding: 0.5rem;
-      font-size: 1rem;
-    }
-
-    button {
-      padding: 0.5rem 1rem;
-      font-size: 1rem;
-    }
-
-    .sheet {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 5mm;
-      justify-content: center;
-    }
-
-    .card {
-      width: 63mm;
-      height: 88mm;
-      object-fit: cover;
-      box-shadow: 0 0 2mm rgba(0,0,0,0.3);
-    }
-
-    @media print {
-      #controls {
-        display: none;
-      }
-      .sheet {
-        page-break-after: always;
-        padding: 0;
-        margin: 0;
-      }
-    }
-  </style>
+  <!-- ✅ Link to external CSS -->
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
   <div id="controls">
     <input type="text" id="deckUrl" placeholder="Paste Archidekt deck URL here" />
-    <button onclick="loadDeck()">Load Deck</button>
+    <button>Load Deck</button>
   </div>
 
   <div class="sheet" id="sheet"></div>
 
-  <script>
-    async function loadDeck() {
-      const url = document.getElementById('deckUrl').value;
-      const match = url.match(/\/decks\/(\d+)/);
-      if (!match) {
-        alert("Invalid Archidekt URL");
-        return;
-      }
-
-      const deckId = match[1];
-      const proxyBase = "https://mtg-proxy-api-server.onrender.com"; // Change this to your deployed backend URL
-      const apiUrl = `${proxyBase}/api/archidekt/${deckId}`;
-
-      const response = await fetch(apiUrl);
-      if (!response.ok) {
-        alert("Failed to load deck.");
-        return;
-      }
-
-      const data = await response.json();
-      const cards = data.cards;
-
-      const container = document.getElementById('sheet');
-      container.innerHTML = '';
-
-      for (const entry of cards) {
-        const count = entry.quantity;
-        const name = entry.card.oracleCard.name;
-
-        try {
-          const scryUrl = `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}`;
-          const scryRes = await fetch(scryUrl);
-          const cardData = await scryRes.json();
-          const imgUrl = cardData.image_uris?.normal || cardData.card_faces?.[0]?.image_uris?.normal;
-
-          if (imgUrl) {
-            for (let i = 0; i < count; i++) {
-              const img = document.createElement('img');
-              img.src = imgUrl;
-              img.className = 'card';
-              container.appendChild(img);
-            }
-          } else {
-            console.warn("No image found for:", name);
-          }
-        } catch (err) {
-          console.error("Error loading image for:", name);
-        }
-      }
-    }
-  </script>
+  <!-- ✅ Link to external JS -->
+  <script src="script.js"></script>
 
 </body>
 </html>
