@@ -1,10 +1,5 @@
 let cachedImages = [];
 
-function extractDeckId(url) {
-  const match = url.match(/\/decks\/(\d+)/);
-  return match ? match[1] : null;
-}
-
 async function loadDeck() {
   const urlInput = document.getElementById('deckUrl');
   const button = document.getElementById('loadBtn');
@@ -12,9 +7,9 @@ async function loadDeck() {
   const loading = document.getElementById('loading');
   const grid = document.getElementById('cardGrid');
 
-  const deckId = extractDeckId(urlInput.value);
-  if (!deckId) {
-    alert("Invalid Archidekt URL!");
+  const deckUrl = urlInput.value.trim();
+  if (!deckUrl.startsWith('http')) {
+    alert("Please enter a valid Archidekt or Moxfield deck URL.");
     return;
   }
 
@@ -26,7 +21,8 @@ async function loadDeck() {
   cachedImages = [];
 
   try {
-    const res = await fetch(`https://mtg-proxy-api-server.onrender.com/api/archidekt/${deckId}`);
+    const encodedUrl = encodeURIComponent(deckUrl);
+    const res = await fetch(`https://mtg-proxy-api-server.onrender.com/api/deck?url=${encodedUrl}`);
     const data = await res.json();
 
     if (!data.images || data.images.length === 0) {
@@ -34,13 +30,15 @@ async function loadDeck() {
     }
 
     data.images.forEach(card => {
-      const div = document.createElement('div');
-      div.className = 'card';
-      const img = document.createElement('img');
-      img.src = card.img;
-      img.alt = card.name;
-      div.appendChild(img);
-      grid.appendChild(div);
+      for (let i = 0; i < card.quantity; i++) {
+        const div = document.createElement('div');
+        div.className = 'card';
+        const img = document.createElement('img');
+        img.src = card.img;
+        img.alt = card.name;
+        div.appendChild(img);
+        grid.appendChild(div);
+      }
     });
 
     cachedImages = data.images;
@@ -73,7 +71,7 @@ function openPrintView() {
           .page {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            grid-auto-rows: 94mm; /* 88mm card height + 6mm spacing */
+            grid-auto-rows: 94mm;
             gap: 5mm;
             padding: 5mm;
             page-break-inside: avoid;
@@ -118,4 +116,3 @@ function openPrintView() {
   win.document.write(html);
   win.document.close();
 }
-
