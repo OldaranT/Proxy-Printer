@@ -70,7 +70,8 @@
       }
 
       const deckId = match[1];
-      const apiUrl = `https://archidekt.com/api/decks/${deckId}/small/`;
+      const proxyBase = "https://YOUR_PROXY_URL_HERE"; // ← CHANGE THIS
+      const apiUrl = `${proxyBase}/api/deck/${deckId}`;
 
       const response = await fetch(apiUrl);
       if (!response.ok) {
@@ -88,21 +89,24 @@
         const count = entry.quantity;
         const name = entry.card.oracleCard.name;
 
-        // Fetch from Scryfall
-        const scryUrl = `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}`;
-        const scryRes = await fetch(scryUrl);
-        const cardData = await scryRes.json();
-        const imgUrl = cardData.image_uris?.normal || cardData.card_faces?.[0]?.image_uris?.normal;
+        try {
+          const scryUrl = `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}`;
+          const scryRes = await fetch(scryUrl);
+          const cardData = await scryRes.json();
+          const imgUrl = cardData.image_uris?.normal || cardData.card_faces?.[0]?.image_uris?.normal;
 
-        if (imgUrl) {
-          for (let i = 0; i < count; i++) {
-            const img = document.createElement('img');
-            img.src = imgUrl;
-            img.className = 'card';
-            container.appendChild(img);
+          if (imgUrl) {
+            for (let i = 0; i < count; i++) {
+              const img = document.createElement('img');
+              img.src = imgUrl;
+              img.className = 'card';
+              container.appendChild(img);
+            }
+          } else {
+            console.warn("No image found for:", name);
           }
-        } else {
-          console.warn("No image found for:", name);
+        } catch (err) {
+          console.error("Error loading image for:", name);
         }
       }
     }
