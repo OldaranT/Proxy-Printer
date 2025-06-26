@@ -1,35 +1,52 @@
-document.getElementById('loadDeck').addEventListener('click', loadDeck);
+console.log("✅ script.js loaded");
 
 async function loadDeck() {
-  const deckId = document.getElementById('deckId').value.trim();
-  if (!deckId) return;
+  console.log("🚀 Load Deck clicked");
 
-  const loading = document.getElementById('loading');
-  const cardContainer = document.getElementById('cardContainer');
-  loading.classList.remove('hidden');
-  cardContainer.innerHTML = '';
+  const url = document.getElementById('deckUrl').value.trim();
+  const match = url.match(/\/decks\/(\d+)/);
+
+  if (!match) {
+    alert("❌ Please enter a valid Archidekt deck URL.");
+    return;
+  }
+
+  const deckId = match[1];
+  const apiUrl = `https://mtg-proxy-api-server.onrender.com/api/archidekt/${deckId}`;
+  console.log(`🌐 Fetching deck from: ${apiUrl}`);
+
+  const spinner = document.getElementById('spinner');
+  const container = document.getElementById('sheet');
+  container.innerHTML = '';
+  spinner.style.display = 'block';
 
   try {
-    const response = await fetch(`https://mtg-proxy-api-server.onrender.com/api/archidekt/${deckId}`);
+    const response = await fetch(apiUrl);
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+
     const data = await response.json();
+    const cards = data.images || [];
 
-    if (!data.images || data.images.length === 0) {
-      loading.textContent = "❌ No cards found or error scraping deck.";
-      return;
-    }
+    console.log(`📦 Received ${cards.length} card(s)`);
 
-    data.images.forEach(card => {
+    for (const card of cards) {
       for (let i = 0; i < card.quantity; i++) {
-        const div = document.createElement('div');
-        div.className = 'card';
-        div.innerHTML = `<img src="${card.img}" alt="${card.name}"><p>${card.name}</p>`;
-        cardContainer.appendChild(div);
+        const img = document.createElement('img');
+        img.src = card.img;
+        img.alt = `${card.name} (${card.set} ${card.collectorNumber})`;
+        img.className = 'card';
+        container.appendChild(img);
       }
-    });
-
-    loading.classList.add('hidden');
+    }
   } catch (err) {
     console.error("❌ Deck load failed:", err);
-    loading.textContent = "❌ Error loading deck.";
+    alert("Failed to load deck. Check console for details.");
+  } finally {
+    spinner.style.display = 'none';
   }
 }
+
+window.addEventListener("DOMContentLoaded", () => {
+  console.log("📄 DOM ready");
+  document.querySelector("button").addEventListener("click", loadDeck);
+});

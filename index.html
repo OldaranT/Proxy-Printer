@@ -4,16 +4,34 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>MTG Proxy Printer</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
-  <div class="container">
-    <h1>🧙 MTG Proxy Printer</h1>
-    <input id="deckId" type="text" placeholder="Enter Archidekt Deck ID" />
-    <button id="loadDeck">Load Deck</button>
-    <div id="loading" class="hidden">Fetching cards, please wait... 🌀</div>
-    <div id="cardContainer"></div>
+  <div class="app">
+    <header>
+      <h1>🧙 MTG Proxy Printer</h1>
+      <p>Paste your Archidekt deck URL to generate printable proxies</p>
+    </header>
+
+    <main>
+      <div class="input-group">
+        <input
+          type="text"
+          id="deckUrl"
+          placeholder="https://archidekt.com/decks/14073656/view"
+        />
+        <button id="loadButton">Load Deck</button>
+      </div>
+
+      <div id="spinner" class="spinner hidden"></div>
+      <div id="sheet" class="sheet"></div>
+    </main>
+
+    <footer>
+      <p>Created with ❤️ for Magic players</p>
+    </footer>
   </div>
+
   <script src="script.js"></script>
 </body>
 </html>
