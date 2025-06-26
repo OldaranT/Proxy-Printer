@@ -70,7 +70,7 @@
       }
 
       const deckId = match[1];
-      const proxyBase = "https://YOUR_BACKEND_URL"; // Change this to your deployed backend URL
+      const proxyBase = "https://mtg-proxy-api-server.onrender.com"; // Change this to your deployed backend URL
       const apiUrl = `${proxyBase}/api/archidekt/${deckId}`;
 
       const response = await fetch(apiUrl);
