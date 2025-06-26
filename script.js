@@ -1,3 +1,5 @@
+console.log("✅ script.js loaded");
+
 async function loadDeck() {
   console.log("Load Deck clicked");
 
