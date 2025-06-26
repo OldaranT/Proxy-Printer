@@ -1,12 +1,24 @@
 console.log("✅ script.js loaded");
 
 async function loadDeck() {
-  console.log("🚀 Load Deck clicked");
-
+  const button = document.querySelector("button");
+  const container = document.getElementById('sheet');
   const url = document.getElementById('deckUrl').value;
-  const match = url.match(/\\/decks\\/(\\d+)/);
+
+  // UI feedback: disable button + show spinner
+  button.disabled = true;
+  button.textContent = "Loading...";
+  container.innerHTML = `
+    <div class="center">
+      <div class="spinner"></div>
+      <p>Fetching deck data...</p>
+    </div>
+  `;
+
+  const match = url.match(/\/decks\/(\d+)/);
   if (!match) {
-    alert("Invalid Archidekt URL");
+    alert("❌ Invalid Archidekt URL");
+    resetUI();
     return;
   }
 
@@ -18,8 +30,9 @@ async function loadDeck() {
   try {
     const response = await fetch(apiUrl);
     if (!response.ok) {
-      alert("Failed to load deck.");
       console.error("❌ API error:", response.status);
+      container.innerHTML = "<p>❌ Failed to load deck data.</p>";
+      resetUI();
       return;
     }
 
@@ -27,9 +40,11 @@ async function loadDeck() {
     const cards = data.images || [];
 
     console.log("📦 Cards received:", cards.length);
-
-    const container = document.getElementById('sheet');
     container.innerHTML = '';
+
+    if (cards.length === 0) {
+      container.innerHTML = "<p>⚠️ No cards found.</p>";
+    }
 
     for (const card of cards) {
       const { name, img, quantity } = card;
@@ -45,7 +60,14 @@ async function loadDeck() {
     }
   } catch (err) {
     console.error("❌ Deck load failed:", err);
-    alert("Unexpected error occurred.");
+    container.innerHTML = "<p>❌ Unexpected error occurred while loading the deck.</p>";
+  }
+
+  resetUI();
+
+  function resetUI() {
+    button.disabled = false;
+    button.textContent = "Load Deck";
   }
 }
 
