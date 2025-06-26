@@ -1,106 +1,62 @@
 body {
-  font-family: 'Segoe UI', sans-serif;
-  background: #1e1e2f;
-  color: #f0f0f0;
+  font-family: sans-serif;
+  background: #f4f4f4;
   margin: 0;
-  padding: 2rem;
+  padding: 20px;
+  color: #333;
+}
+
+.container {
+  max-width: 960px;
+  margin: auto;
   text-align: center;
 }
 
-h1 {
-  font-size: 2.5rem;
-  color: #61dafb;
-  margin-bottom: 1.5rem;
-}
-
-.input-group {
-  display: flex;
-  justify-content: center;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
-  flex-wrap: wrap;
-}
-
-input[type="text"] {
+input {
+  padding: 10px;
+  font-size: 16px;
   width: 300px;
-  padding: 0.6rem 1rem;
-  border: none;
-  border-radius: 6px;
-  font-size: 1rem;
+  margin-right: 10px;
 }
 
 button {
-  background: #61dafb;
+  padding: 10px 20px;
+  font-size: 16px;
+  background: #007acc;
+  color: white;
   border: none;
-  padding: 0.6rem 1.2rem;
-  border-radius: 6px;
-  font-size: 1rem;
-  font-weight: bold;
   cursor: pointer;
-  transition: background 0.2s ease-in-out;
 }
 
-button:hover:not(:disabled) {
-  background: #4db8e7;
+button:hover {
+  background: #005fa3;
 }
 
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+#loading {
+  margin-top: 20px;
+  font-weight: bold;
 }
 
-#status {
-  margin: 1rem 0;
-  font-size: 1rem;
-  color: #ccc;
-}
-
-.card-container {
+#cardContainer {
+  margin-top: 40px;
   display: flex;
   flex-wrap: wrap;
+  gap: 10px;
   justify-content: center;
-  gap: 1rem;
-  margin-top: 2rem;
 }
 
-.card-container img {
-  width: 223px;
-  height: 310px;
-  object-fit: cover;
-  border-radius: 8px;
-  box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
-  transition: transform 0.2s ease;
+.card {
+  width: 200px;
+  border: 1px solid #ccc;
+  padding: 10px;
+  background: white;
+  box-shadow: 0 0 5px rgba(0,0,0,0.1);
 }
 
-.card-container img:hover {
-  transform: scale(1.05);
-}
-
-#status {
-  margin: 1rem 0;
-  font-size: 1rem;
-  color: #ccc;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 1rem;
-}
-
-.spinner {
-  border: 4px solid rgba(255, 255, 255, 0.2);
-  border-top: 4px solid #61dafb;
-  border-radius: 50%;
-  width: 28px;
-  height: 28px;
-  animation: spin 1s linear infinite;
+.card img {
+  width: 100%;
 }
 
 .hidden {
   display: none;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
