@@ -24,22 +24,30 @@ async function loadDeck() {
     }
 
     const data = await response.json();
-    console.log("🔎 Deck data:", data);
+    console.log("🔎 Deck export data:", data);
 
-    const cards = data.cards;
-    console.log("📦 Card count:", cards?.length ?? 0);
+    // Flatten all cards from categories that are included in the deck
+    const cards = [];
+    for (const category of data.categories) {
+      if (!category.includedInDeck) continue;
+      for (const card of category.cards) {
+        cards.push(card);
+      }
+    }
+
+    console.log("📦 Flattened cards:", cards.length);
 
     const container = document.getElementById('sheet');
     container.innerHTML = '';
 
-    if (!Array.isArray(cards) || cards.length === 0) {
+    if (cards.length === 0) {
       console.warn("⚠️ No cards found in deck.");
       return;
     }
 
-    for (const entry of cards) {
-      const count = entry.quantity;
-      const name = entry.card.oracleCard.name;
+    for (const card of cards) {
+      const count = card.quantity;
+      const name = card.card.name;
       console.log(`🃏 ${name} x${count}`);
 
       try {
