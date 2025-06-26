@@ -1,52 +1,98 @@
-console.log("✅ script.js loaded");
+let cachedImages = [];
+
+function extractDeckId(url) {
+  const match = url.match(/\/decks\/(\d+)/);
+  return match ? match[1] : null;
+}
 
 async function loadDeck() {
-  console.log("🚀 Load Deck clicked");
+  const urlInput = document.getElementById('deckUrl');
+  const button = document.getElementById('loadBtn');
+  const printBtn = document.getElementById('printBtn');
+  const loading = document.getElementById('loading');
+  const grid = document.getElementById('cardGrid');
 
-  const url = document.getElementById('deckUrl').value.trim();
-  const match = url.match(/\/decks\/(\d+)/);
-
-  if (!match) {
-    alert("❌ Please enter a valid Archidekt deck URL.");
+  const deckId = extractDeckId(urlInput.value);
+  if (!deckId) {
+    alert("Invalid Archidekt URL!");
     return;
   }
 
-  const deckId = match[1];
-  const apiUrl = `https://mtg-proxy-api-server.onrender.com/api/archidekt/${deckId}`;
-  console.log(`🌐 Fetching deck from: ${apiUrl}`);
-
-  const spinner = document.getElementById('spinner');
-  const container = document.getElementById('sheet');
-  container.innerHTML = '';
-  spinner.style.display = 'block';
+  urlInput.disabled = true;
+  button.disabled = true;
+  printBtn.disabled = true;
+  loading.classList.remove('hidden');
+  grid.innerHTML = '';
+  cachedImages = [];
 
   try {
-    const response = await fetch(apiUrl);
-    if (!response.ok) throw new Error(`API error: ${response.status}`);
+    const res = await fetch(`https://mtg-proxy-api-server.onrender.com/api/archidekt/${deckId}`);
+    const data = await res.json();
 
-    const data = await response.json();
-    const cards = data.images || [];
-
-    console.log(`📦 Received ${cards.length} card(s)`);
-
-    for (const card of cards) {
-      for (let i = 0; i < card.quantity; i++) {
-        const img = document.createElement('img');
-        img.src = card.img;
-        img.alt = `${card.name} (${card.set} ${card.collectorNumber})`;
-        img.className = 'card';
-        container.appendChild(img);
-      }
+    if (!data.images || data.images.length === 0) {
+      throw new Error("No images returned.");
     }
+
+    data.images.forEach(card => {
+      const div = document.createElement('div');
+      div.className = 'card';
+      const img = document.createElement('img');
+      img.src = card.img;
+      img.alt = card.name;
+      div.appendChild(img);
+      grid.appendChild(div);
+    });
+
+    cachedImages = data.images;
+    printBtn.disabled = false;
+
   } catch (err) {
     console.error("❌ Deck load failed:", err);
-    alert("Failed to load deck. Check console for details.");
-  } finally {
-    spinner.style.display = 'none';
+    alert("Failed to load deck.");
   }
+
+  loading.classList.add('hidden');
+  urlInput.disabled = false;
+  button.disabled = false;
 }
 
-window.addEventListener("DOMContentLoaded", () => {
-  console.log("📄 DOM ready");
-  document.querySelector("button").addEventListener("click", loadDeck);
-});
+function openPrintView() {
+  if (!cachedImages.length) return;
+
+  const win = window.open('', '_blank');
+  const html = `
+    <html>
+    <head>
+      <title>Print Template</title>
+      <style>
+        body {
+          background: white;
+          color: black;
+          padding: 0;
+          margin: 0;
+        }
+        .page {
+          display: flex;
+          flex-wrap: wrap;
+          padding: 10mm;
+          gap: 5mm;
+        }
+        img {
+          width: 63mm;
+          height: 88mm;
+          object-fit: cover;
+          box-shadow: 0 0 2mm rgba(0,0,0,0.3);
+        }
+      </style>
+    </head>
+    <body>
+      <div class="page">
+        ${cachedImages.map(card => Array(card.quantity).fill(`<img src="${card.img}" alt="${card.name}" />`).join('')).join('')}
+      </div>
+      <script>window.print();</script>
+    </body>
+    </html>
+  `;
+  win.document.write(html);
+  win.document.close();
+}

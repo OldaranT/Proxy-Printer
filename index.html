@@ -1,35 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MTG Proxy Printer</title>
-  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app">
-    <header>
-      <h1>🧙 MTG Proxy Printer</h1>
-      <p>Paste your Archidekt deck URL to generate printable proxies</p>
-    </header>
-
-    <main>
-      <div class="input-group">
-        <input
-          type="text"
-          id="deckUrl"
-          placeholder="https://archidekt.com/decks/14073656/view"
-        />
-        <button id="loadButton">Load Deck</button>
-      </div>
-
-      <div id="spinner" class="spinner hidden"></div>
-      <div id="sheet" class="sheet"></div>
-    </main>
-
-    <footer>
-      <p>Created with ❤️ for Magic players</p>
-    </footer>
+  <div class="container">
+    <h1>🧙 MTG Proxy Printer</h1>
+    <div class="input-group">
+      <input id="deckUrl" type="text" placeholder="Paste Archidekt deck URL..." />
+      <button id="loadBtn" onclick="loadDeck()">Load Deck</button>
+      <button id="printBtn" onclick="openPrintView()" disabled>Show Print Template</button>
+    </div>
+    <div id="loading" class="hidden">⏳ Loading cards...</div>
+    <div id="cardGrid"></div>
   </div>
 
   <script src="script.js"></script>
