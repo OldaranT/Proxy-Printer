@@ -4,7 +4,7 @@ async function loadDeck() {
   console.log("🚀 Load Deck clicked");
 
   const url = document.getElementById('deckUrl').value;
-  const match = url.match(/\/decks\/(\d+)/);
+  const match = url.match(/\\/decks\\/(\\d+)/);
   if (!match) {
     alert("Invalid Archidekt URL");
     return;
