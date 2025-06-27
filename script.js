@@ -73,23 +73,26 @@ function openPrintView() {
           background: white;
           padding: 0;
           margin: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 100vh;
         }
         .sheet {
           display: grid;
           grid-template-columns: repeat(3, 63mm);
           grid-template-rows: repeat(3, 88mm);
           gap: 0;
-          justify-content: center;
-          align-items: center;
           position: relative;
           width: 210mm;
           height: 297mm;
-          margin: auto;
         }
         .sheet img {
           width: 63mm;
           height: 88mm;
           object-fit: cover;
+          position: relative;
+          z-index: 2;
         }
         .cutlines {
           position: absolute;
@@ -98,6 +101,7 @@ function openPrintView() {
           width: 210mm;
           height: 297mm;
           pointer-events: none;
+          z-index: 1;
         }
         .cutlines canvas {
           width: 210mm;
@@ -117,11 +121,8 @@ function openPrintView() {
       <script>
         const canvas = document.querySelector('.cutlines canvas');
         const ctx = canvas.getContext('2d');
-        ctx.strokeStyle = "#888";
+        ctx.strokeStyle = "#00ff00";
         ctx.lineWidth = 0.5;
-
-        const w = canvas.width;
-        const h = canvas.height;
 
         const mmToPx = mm => mm * 3.78;
         const cardW = mmToPx(63);
@@ -131,7 +132,7 @@ function openPrintView() {
           const x = i * cardW;
           ctx.beginPath();
           ctx.moveTo(x, 0);
-          ctx.lineTo(x, h);
+          ctx.lineTo(x, canvas.height);
           ctx.stroke();
         }
 
@@ -139,7 +140,7 @@ function openPrintView() {
           const y = i * cardH;
           ctx.beginPath();
           ctx.moveTo(0, y);
-          ctx.lineTo(w, y);
+          ctx.lineTo(canvas.width, y);
           ctx.stroke();
         }
 
@@ -153,14 +154,13 @@ function openPrintView() {
   win.document.close();
 }
 
-// Spinner icon rotation
+// Icon rotation
 const spinnerIcon = document.getElementById('spinnerIcon');
 const iconPaths = [
-  'public/icons/FF-ICON-1.png',
-  'public/icons/FF-ICON-2.png',
-  'public/icons/FF-ICON-3.png'
+  'public/icons/FF-ICON-1.PNG',
+  'public/icons/FF-ICON-2.PNG',
+  'public/icons/FF-ICON-3.PNG'
 ];
-
 let currentIconIndex = 0;
 setInterval(() => {
   currentIconIndex = (currentIconIndex + 1) % iconPaths.length;
