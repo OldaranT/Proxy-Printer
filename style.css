@@ -99,7 +99,7 @@ button:disabled {
 }
 
 .btn {
-  background-color: #2f4f2f; /* forest green */
+  background-color: #444; /* default gray (for toggle unchecked) */
   color: #fff;
   padding: 10px 16px;
   border: none;
@@ -110,17 +110,25 @@ button:disabled {
   user-select: none;
   transition: background-color 0.2s ease;
   width: 200px;
+  display: inline-block;
+  box-sizing: border-box;
+  text-align: center;
 }
 
 .btn:hover {
-  background-color: #3c6e3c;
+  background-color: #666;
+}
+
+.btn.active {
+  background-color: #2f4f2f; /* green when active */
 }
 
 .btn:disabled {
-  background-color: #444;
+  background-color: #333;
   cursor: not-allowed;
 }
 
-#cutlineToggleWrapper.active {
-  background-color: #005500;
+#cutlineToggleWrapper input {
+  display: none;
 }
+

@@ -1,13 +1,18 @@
 let cachedImages = [];
 
 document.addEventListener('DOMContentLoaded', () => {
-  const cutlineToggle = document.getElementById('cutlineToggle');
-  const cutlineWrapper = document.getElementById('cutlineToggleWrapper');
+  const toggleWrapper = document.getElementById('cutlineToggleWrapper');
+  const toggleCheckbox = document.getElementById('cutlineToggle');
 
-  cutlineToggle.addEventListener('change', () => {
-    cutlineWrapper.classList.toggle('active', cutlineToggle.checked);
+  toggleWrapper.addEventListener('click', () => {
+    toggleCheckbox.checked = !toggleCheckbox.checked;
+    toggleWrapper.classList.toggle('active', toggleCheckbox.checked);
   });
+
+  // Ensure initial state is synced
+  toggleWrapper.classList.toggle('active', toggleCheckbox.checked);
 });
+
 
 function extractDeckUrl(url) {
   return url.trim();
