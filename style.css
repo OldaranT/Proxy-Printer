@@ -99,7 +99,7 @@ button:disabled {
 }
 
 .btn {
-  background-color: #222;
+  background-color: #2f4f2f; /* forest green */
   color: #fff;
   padding: 10px 16px;
   border: none;
@@ -109,13 +109,18 @@ button:disabled {
   text-align: center;
   user-select: none;
   transition: background-color 0.2s ease;
+  width: 200px;
 }
 
 .btn:hover {
-  background-color: #333;
+  background-color: #3c6e3c;
+}
+
+.btn:disabled {
+  background-color: #444;
+  cursor: not-allowed;
 }
 
 #cutlineToggleWrapper.active {
   background-color: #005500;
 }
-
