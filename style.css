@@ -81,9 +81,6 @@ button:disabled {
   border-top: 4px solid #00cc00;
   border-radius: 50%;
   animation: rotate 1s linear infinite;
-  background: conic-gradient(from 0deg, #00cc00 0%, #000000 100%);
-  -webkit-mask: radial-gradient(circle 35px at center, transparent 34px, black 35px);
-          mask: radial-gradient(circle 35px at center, transparent 34px, black 35px);
 }
 
 .spinner-icon {
