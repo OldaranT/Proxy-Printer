@@ -156,9 +156,9 @@ function openPrintView() {
 // Spinner icon rotation
 const spinnerIcon = document.getElementById('spinnerIcon');
 const iconPaths = [
-  'public/icons/FIN_expansion_symbol.png',
-  'public/icons/2_Yu3v3e1Kpp.png',
-  'public/icons/3_Yu3v3e1Kpp.png'
+  'public/icons/FF-ICON-1.png',
+  'public/icons/FF-ICON-2.png',
+  'public/icons/FF-ICON-3.png'
 ];
 
 let currentIconIndex = 0;
