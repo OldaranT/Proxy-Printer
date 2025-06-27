@@ -2,21 +2,24 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MTG Proxy Printer</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="container">
-    <h1>🧙 MTG Proxy Printer</h1>
-    <div class="input-group">
-      <input id="deckUrl" type="text" placeholder="Paste Archidekt deck URL..." />
-      <button id="loadBtn" onclick="loadDeck()">Load Deck</button>
-      <button id="printBtn" onclick="openPrintView()" disabled>Show Print Template</button>
+  <h1>MTG Proxy Printer</h1>
+  <input type="text" id="deckUrl" placeholder="Paste Archidekt or Moxfield deck URL">
+  <button id="loadBtn" onclick="loadDeck()">Load Deck</button>
+  <button id="printBtn" onclick="openPrintView()" disabled>Print Template</button>
+
+  <div id="loading" class="hidden">
+    <div class="spinner">
+      <img src="public/icons/FF-ICON-1.png" alt="FF-ICON-1">
+      <img src="public/icons/FF-ICON-1.pngg" alt="FF-ICON-2">
+      <img src="public/icons/FF-ICON-1.png" alt="FF-ICON-3">
     </div>
-    <div id="loading" class="hidden">⏳ Loading cards...</div>
-    <div id="cardGrid"></div>
   </div>
+
+  <div id="cardGrid"></div>
 
   <script src="script.js"></script>
 </body>
