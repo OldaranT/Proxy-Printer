@@ -79,6 +79,8 @@ function openPrintView() {
           height: 100vh;
         }
         .sheet {
+          top: 16.5mm;
+          left: 10.5.mm;
           display: grid;
           grid-template-columns: repeat(3, 63mm);
           grid-template-rows: repeat(3, 88mm);
@@ -96,8 +98,8 @@ function openPrintView() {
         }
         .cutlines {
           position: absolute;
-          top: 0;
-          left: 0;
+          top: 16.5mm;
+          left: 10.5.mm;
           width: 210mm;
           height: 297mm;
           pointer-events: none;
