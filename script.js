@@ -73,15 +73,7 @@ function openPrintView() {
 
   const showCutlines = document.getElementById('cutlineToggle')?.checked;
   const win = window.open('', '_blank');
-
-  const images = cachedImages.flatMap(card =>
-    Array(card.quantity).fill(card.img)
-  );
-
-  const pages = [];
-  for (let i = 0; i < images.length; i += 9) {
-    pages.push(images.slice(i, i + 9));
-  }
+  const cards = cachedImages.flatMap(card => Array(card.quantity).fill(card.img));
 
   const html = `
   <html>
@@ -92,48 +84,40 @@ function openPrintView() {
         size: A4 portrait;
         margin: 0;
       }
-      html, body {
+      body {
         margin: 0;
         padding: 0;
         background: white;
       }
-      body {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-      }
-      .sheet {
-        width: 210mm;
-        height: 297mm;
+      .page {
         position: relative;
+        width: 210mm;
+        height: 291mm;
         page-break-after: always;
-        overflow: hidden;
       }
       .cutlines {
         position: absolute;
         top: 0;
         left: 0;
+        width: 210mm;
+        height: 297mm;
         z-index: 1;
         display: ${showCutlines ? 'block' : 'none'};
         pointer-events: none;
       }
-      .cutlines canvas {
-        width: 210mm;
-        height: 297mm;
-        display: block;
-      }
-      .grid {
+      .sheet {
         position: absolute;
-        top: 16.5mm;
+        top: 13.5mm;
         left: 10.5mm;
         width: 189mm;
-        height: 264mm;
+        height: 291mm;
         display: grid;
         grid-template-columns: repeat(3, 63mm);
         grid-template-rows: repeat(3, 88mm);
+        gap: 0;
         z-index: 2;
       }
-      .grid img {
+      .sheet img {
         width: 63mm;
         height: 88mm;
         object-fit: cover;
@@ -142,48 +126,54 @@ function openPrintView() {
     </style>
   </head>
   <body>
-    ${pages.map((page, index) => `
-      <div class="sheet">
-        <div class="cutlines"><canvas id="canvas${index}" width="793" height="1122"></canvas></div>
-        <div class="grid">
-          ${page.map(img => `<img src="${img}" />`).join('')}
-        </div>
-      </div>
-    `).join('')}
-
+    ${(() => {
+      const pages = [];
+      for (let i = 0; i < cards.length; i += 9) {
+        const cardImgs = cards.slice(i, i + 9);
+        const images = cardImgs.map(src => `<img src="${src}" />`).join('');
+        pages.push(`
+          <div class="page">
+            <div class="sheet">${images}</div>
+            <div class="cutlines">
+              <canvas width="794" height="1123"></canvas>
+            </div>
+          </div>
+        `);
+      }
+      return pages.join('');
+    })()}
     <script>
-      const pxPerMM = 793 / 210; // Based on 96 DPI at 210mm width
+      const canvases = document.querySelectorAll('.cutlines canvas');
+      canvases.forEach(canvas => {
+        const ctx = canvas.getContext('2d');
+        const pxPerMM = canvas.width / 210;
+        const cardW = 63 * pxPerMM;
+        const cardH = 88 * pxPerMM;
+        const left = 10.5 * pxPerMM;
+        const top = 13.5 * pxPerMM;
+        const extend = 5 * pxPerMM;
 
-      const leftMargin = 10.5 * pxPerMM;
-      const topMargin = 16.5 * pxPerMM;
-      const cardW = 63 * pxPerMM;
-      const cardH = 88 * pxPerMM;
+        ctx.strokeStyle = '#00ff00';
+        ctx.lineWidth = 1.5;
 
-      const pageCount = ${pages.length};
-
-      for (let p = 0; p < pageCount; p++) {
-        const canvas = document.getElementById("canvas" + p);
-        const ctx = canvas.getContext("2d");
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle = "#00FF00";
-        ctx.lineWidth = 0.5;
-
+        // Vertical cutlines
         for (let i = 0; i <= 3; i++) {
-          const x = leftMargin + i * cardW;
+          const x = left + i * cardW;
           ctx.beginPath();
           ctx.moveTo(x, 0);
           ctx.lineTo(x, canvas.height);
           ctx.stroke();
         }
 
-        for (let j = 0; j <= 3; j++) {
-          const y = topMargin + j * cardH;
+        // Horizontal cutlines
+        for (let i = 0; i <= 3; i++) {
+          const y = top + i * cardH;
           ctx.beginPath();
           ctx.moveTo(0, y);
           ctx.lineTo(canvas.width, y);
           ctx.stroke();
         }
-      }
+      });
 
       window.onload = () => window.print();
     </script>
