@@ -59,116 +59,115 @@ function openPrintView() {
 
   const win = window.open('', '_blank');
   const html = `
-    <html>
-    <head>
-      <title>Print Template</title>
-      <style>
-        @media print {
-          body {
-            margin: 0;
-            padding: 0;
-          }
+  <html>
+  <head>
+    <title>Print Template</title>
+    <style>
+      @page {
+        size: A4 portrait;
+        margin: 0;
+      }
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 210mm;
+        height: 297mm;
+        background: white;
+        overflow: hidden;
+        position: relative;
+      }
+      .cutlines {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 210mm;
+        height: 297mm;
+        z-index: 1;
+        pointer-events: none;
+      }
+      canvas {
+        display: block;
+        width: 210mm;
+        height: 297mm;
+      }
+      .sheet {
+        position: absolute;
+        top: 16.5mm;
+        left: 10.5mm;
+        width: 189mm;
+        height: 264mm;
+        display: grid;
+        grid-template-columns: repeat(3, 63mm);
+        grid-template-rows: repeat(3, 88mm);
+        z-index: 2;
+      }
+      .sheet img {
+        width: 63mm;
+        height: 88mm;
+        object-fit: cover;
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="cutlines">
+      <canvas id="cutCanvas" width="794" height="1123"></canvas>
+    </div>
+    <div class="sheet" id="cardSheet"></div>
+
+    <script>
+      const images = ${JSON.stringify(cachedImages)};
+      const sheet = document.getElementById('cardSheet');
+
+      images.forEach(card => {
+        for (let i = 0; i < card.quantity; i++) {
+          const img = document.createElement('img');
+          img.src = card.img;
+          img.alt = card.name;
+          sheet.appendChild(img);
         }
+      });
 
-        html, body {
-          background: white;
-          padding: 0;
-          margin: 0;
-          width: 210mm;
-          height: 297mm;
-        }
+      const canvas = document.getElementById('cutCanvas');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = '#00FF00';
+      ctx.lineWidth = 0.5;
 
-        .sheet {
-          position: absolute;
-          top: 16.5mm;
-          left: 10.5mm;
-          display: grid;
-          grid-template-columns: repeat(3, 63mm);
-          grid-template-rows: repeat(3, 88mm);
-          gap: 0;
-          width: calc(63mm * 3);
-          height: calc(88mm * 3);
-        }
+      // Scale
+      const pxPerMM = canvas.width / 210;
+      const leftMargin = 10.5 * pxPerMM;
+      const topMargin = 16.5 * pxPerMM;
+      const cardW = 63 * pxPerMM;
+      const cardH = 88 * pxPerMM;
 
-        .sheet img {
-          width: 63mm;
-          height: 88mm;
-          object-fit: cover;
-          position: relative;
-          z-index: 2;
-        }
+      // Draw vertical lines across full page
+      for (let i = 0; i <= 3; i++) {
+        const x = leftMargin + i * cardW;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
 
-        .cutlines {
-          position: absolute;
-          top: 16.5mm;
-          left: 10.5mm;
-          width: calc(63mm * 3);
-          height: calc(88mm * 3);
-          pointer-events: none;
-          z-index: 1;
-        }
-
-        .cutlines canvas {
-          width: 100%;
-          height: 100%;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="sheet" id="sheet"></div>
-      <div class="cutlines">
-        <canvas width="567" height="999"></canvas>
-      </div>
-
-      <script>
-        const cards = ${JSON.stringify(cachedImages)};
-        const sheet = document.getElementById('sheet');
-
-        cards.forEach(card => {
-          for (let i = 0; i < card.quantity; i++) {
-            const img = document.createElement('img');
-            img.src = card.img;
-            img.alt = card.name;
-            sheet.appendChild(img);
-          }
-        });
-
-        const canvas = document.querySelector('.cutlines canvas');
-        const ctx = canvas.getContext('2d');
-        ctx.strokeStyle = "#00ff00";
-        ctx.lineWidth = 0.5;
-
-        const mmToPx = mm => mm * (canvas.width / (63 * 3));
-        const cardW = mmToPx(63);
-        const cardH = mmToPx(88);
-
-        for (let i = 1; i < 3; i++) {
-          const x = i * cardW;
-          ctx.beginPath();
-          ctx.moveTo(x, 0);
-          ctx.lineTo(x, canvas.height);
-          ctx.stroke();
-        }
-
-        for (let i = 1; i < 3; i++) {
-          const y = i * cardH;
-          ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(canvas.width, y);
-          ctx.stroke();
-        }
-
-        setTimeout(() => {
-          window.print();
-        }, 500);
-      </script>
-    </body>
-    </html>
+      // Draw horizontal lines across full page
+      for (let i = 0; i <= 3; i++) {
+        const y = topMargin + i * cardH;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+        
+    </script>
+  </body>
+  </html>
   `;
 
   win.document.write(html);
   win.document.close();
 }
+
 
 // Icon rotation
 const spinnerIcon = document.getElementById('spinnerIcon');
