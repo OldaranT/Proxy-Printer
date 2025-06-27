@@ -1,5 +1,14 @@
 let cachedImages = [];
 
+document.addEventListener('DOMContentLoaded', () => {
+  const cutlineToggle = document.getElementById('cutlineToggle');
+  const cutlineWrapper = document.getElementById('cutlineToggleWrapper');
+
+  cutlineToggle.addEventListener('change', () => {
+    cutlineWrapper.classList.toggle('active', cutlineToggle.checked);
+  });
+});
+
 function extractDeckUrl(url) {
   return url.trim();
 }
@@ -57,6 +66,7 @@ async function loadDeck() {
 function openPrintView() {
   if (!cachedImages.length) return;
 
+  const showCutlines = document.getElementById('cutlineToggle')?.checked;
   const win = window.open('', '_blank');
   const html = `
   <html>
@@ -84,6 +94,7 @@ function openPrintView() {
         height: 297mm;
         z-index: 1;
         pointer-events: none;
+        display: ${showCutlines ? 'block' : 'none'};
       }
       canvas {
         display: block;
@@ -158,7 +169,7 @@ function openPrintView() {
         ctx.lineTo(canvas.width, y);
         ctx.stroke();
       }
-        
+
     </script>
   </body>
   </html>

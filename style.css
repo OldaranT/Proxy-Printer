@@ -97,3 +97,25 @@ button:disabled {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+.btn {
+  background-color: #222;
+  color: #fff;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  text-align: center;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.btn:hover {
+  background-color: #333;
+}
+
+#cutlineToggleWrapper.active {
+  background-color: #005500;
+}
+
