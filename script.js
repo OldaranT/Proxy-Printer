@@ -101,10 +101,10 @@ function openPrintView() {
         pointer-events: none;
         display: ${showCutlines ? 'block' : 'none'};
       }
-      canvas {
-        display: block;
+      .cutlines canvas {
         width: 210mm;
         height: 297mm;
+        display: block;
       }
       .sheet {
         position: absolute;
@@ -127,7 +127,7 @@ function openPrintView() {
   </head>
   <body>
     <div class="cutlines">
-      <canvas id="cutCanvas" width="794" height="1123"></canvas>
+      <canvas id="cutCanvas"></canvas>
     </div>
     <div class="sheet" id="cardSheet"></div>
 
@@ -144,37 +144,45 @@ function openPrintView() {
         }
       });
 
-      const canvas = document.getElementById('cutCanvas');
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.strokeStyle = '#00FF00';
-      ctx.lineWidth = 0.5;
+      // Setup canvas after DOM is ready
+      window.onload = () => {
+        const canvas = document.getElementById('cutCanvas');
+        const dpi = 96;
+        canvas.width = Math.round((210 / 25.4) * dpi); // ~794
+        canvas.height = Math.round((297 / 25.4) * dpi); // ~1123
 
-      // Scale
-      const pxPerMM = canvas.width / 210;
-      const leftMargin = 10.5 * pxPerMM;
-      const topMargin = 16.5 * pxPerMM;
-      const cardW = 63 * pxPerMM;
-      const cardH = 88 * pxPerMM;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = '#00FF00';
+        ctx.lineWidth = 0.5;
 
-      // Draw vertical lines across full page
-      for (let i = 0; i <= 3; i++) {
-        const x = leftMargin + i * cardW;
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-      }
+        const pxPerMM = dpi / 25.4;
+        const cardW = 63 * pxPerMM;
+        const cardH = 88 * pxPerMM;
+        const leftMargin = 10.5 * pxPerMM;
+        const topMargin = 16.5 * pxPerMM;
 
-      // Draw horizontal lines across full page
-      for (let i = 0; i <= 3; i++) {
-        const y = topMargin + i * cardH;
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
-      }
+        // Vertical cut lines
+        for (let i = 0; i <= 3; i++) {
+          const x = leftMargin + i * cardW;
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, canvas.height);
+          ctx.stroke();
+        }
 
+        // Horizontal cut lines
+        for (let i = 0; i <= 3; i++) {
+          const y = topMargin + i * cardH;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvas.width, y);
+          ctx.stroke();
+        }
+
+        // Print only after layout is stable
+        setTimeout(() => window.print(), 100);
+      };
     </script>
   </body>
   </html>
@@ -183,6 +191,7 @@ function openPrintView() {
   win.document.write(html);
   win.document.close();
 }
+
 
 
 // Icon rotation
