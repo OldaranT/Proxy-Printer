@@ -157,9 +157,9 @@ function openPrintView() {
 // Icon rotation
 const spinnerIcon = document.getElementById('spinnerIcon');
 const iconPaths = [
-  'public/icons/FF-ICON-1.PNG',
-  'public/icons/FF-ICON-2.PNG',
-  'public/icons/FF-ICON-3.PNG'
+  'public/icons/FF-ICON-1.png',
+  'public/icons/FF-ICON-2.png',
+  'public/icons/FF-ICON-3.png'
 ];
 let currentIconIndex = 0;
 setInterval(() => {
