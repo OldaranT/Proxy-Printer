@@ -69,26 +69,27 @@ function openPrintView() {
             padding: 0;
           }
         }
-        body {
+
+        html, body {
           background: white;
           padding: 0;
           margin: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 100vh;
+          width: 210mm;
+          height: 297mm;
         }
+
         .sheet {
+          position: absolute;
           top: 16.5mm;
-          left: 10.5.mm;
+          left: 10.5mm;
           display: grid;
           grid-template-columns: repeat(3, 63mm);
           grid-template-rows: repeat(3, 88mm);
           gap: 0;
-          position: relative;
-          width: 210mm;
-          height: 297mm;
+          width: calc(63mm * 3);
+          height: calc(88mm * 3);
         }
+
         .sheet img {
           width: 63mm;
           height: 88mm;
@@ -96,18 +97,20 @@ function openPrintView() {
           position: relative;
           z-index: 2;
         }
+
         .cutlines {
           position: absolute;
           top: 16.5mm;
-          left: 10.5.mm;
-          width: 210mm;
-          height: 297mm;
+          left: 10.5mm;
+          width: calc(63mm * 3);
+          height: calc(88mm * 3);
           pointer-events: none;
           z-index: 1;
         }
+
         .cutlines canvas {
-          width: 210mm;
-          height: 297mm;
+          width: 100%;
+          height: 100%;
         }
       </style>
     </head>
@@ -117,19 +120,21 @@ function openPrintView() {
           Array(card.quantity).fill(`<img src="${card.img}" alt="${card.name}"/>`).join('')
         ).join('')}
         <div class="cutlines">
-          <canvas width="793" height="1122"></canvas>
+          <canvas width="567" height="999"></canvas>
         </div>
       </div>
+
       <script>
         const canvas = document.querySelector('.cutlines canvas');
         const ctx = canvas.getContext('2d');
         ctx.strokeStyle = "#00ff00";
         ctx.lineWidth = 0.5;
 
-        const mmToPx = mm => mm * 3.78;
+        const mmToPx = mm => mm * (canvas.width / (63 * 3)); // scale to canvas width
         const cardW = mmToPx(63);
         const cardH = mmToPx(88);
 
+        // Draw vertical lines
         for (let i = 1; i < 3; i++) {
           const x = i * cardW;
           ctx.beginPath();
@@ -138,6 +143,7 @@ function openPrintView() {
           ctx.stroke();
         }
 
+        // Draw horizontal lines
         for (let i = 1; i < 3; i++) {
           const y = i * cardH;
           ctx.beginPath();
