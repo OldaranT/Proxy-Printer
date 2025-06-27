@@ -1,4 +1,5 @@
 let cachedImages = [];
+let cachedDeckName = "Deck";
 
 document.addEventListener('DOMContentLoaded', () => {
   const toggleWrapper = document.getElementById('cutlineToggleWrapper');
@@ -30,6 +31,15 @@ async function loadDeck() {
     alert("Please enter a valid Archidekt or Moxfield URL.");
     return;
   }
+  
+  const url = urlInput.value.trim();
+  const urlParts = url.split('/');
+  cachedDeckName = urlParts
+    .filter(part => part && !/^\d+$/.test(part)) // filter out numeric segments
+    .pop()                                      // last non-numeric part
+    ?.replace(/[-_]/g, ' ')                     // convert dashes to spaces
+    ?.replace(/[^\w\s]/g, '')                   // remove special chars
+    ?.trim() || "Deck";     
 
   urlInput.disabled = true;
   button.disabled = true;
@@ -70,10 +80,12 @@ async function loadDeck() {
 
 function openPrintView() {
   if (!cachedImages.length) return;
-
+  
+  const deckName = cachedDeckName;
   const showCutlines = document.getElementById('cutlineToggle')?.checked;
   const win = window.open('', '_blank');
   const cards = cachedImages.flatMap(card => Array(card.quantity).fill(card.img));
+  const title = `${deckName} ${showCutlines ? '(cutlines)' : '(no cutlines)'}`;
 
   const html = `
   <html>
@@ -143,6 +155,7 @@ function openPrintView() {
       return pages.join('');
     })()}
     <script>
+      document.title = ${JSON.stringify(title)};
       const canvases = document.querySelectorAll('.cutlines canvas');
       canvases.forEach(canvas => {
         const ctx = canvas.getContext('2d');
