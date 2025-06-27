@@ -73,6 +73,16 @@ function openPrintView() {
 
   const showCutlines = document.getElementById('cutlineToggle')?.checked;
   const win = window.open('', '_blank');
+
+  const images = cachedImages.flatMap(card =>
+    Array(card.quantity).fill(card.img)
+  );
+
+  const pages = [];
+  for (let i = 0; i < images.length; i += 9) {
+    pages.push(images.slice(i, i + 9));
+  }
+
   const html = `
   <html>
   <head>
@@ -85,28 +95,34 @@ function openPrintView() {
       html, body {
         margin: 0;
         padding: 0;
+        background: white;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .sheet {
         width: 210mm;
         height: 297mm;
-        background: white;
-        overflow: hidden;
         position: relative;
+        page-break-after: always;
+        overflow: hidden;
       }
       .cutlines {
         position: absolute;
         top: 0;
         left: 0;
-        width: 210mm;
-        height: 297mm;
         z-index: 1;
-        pointer-events: none;
         display: ${showCutlines ? 'block' : 'none'};
+        pointer-events: none;
       }
       .cutlines canvas {
         width: 210mm;
         height: 297mm;
         display: block;
       }
-      .sheet {
+      .grid {
         position: absolute;
         top: 16.5mm;
         left: 10.5mm;
@@ -117,7 +133,7 @@ function openPrintView() {
         grid-template-rows: repeat(3, 88mm);
         z-index: 2;
       }
-      .sheet img {
+      .grid img {
         width: 63mm;
         height: 88mm;
         object-fit: cover;
@@ -126,43 +142,32 @@ function openPrintView() {
     </style>
   </head>
   <body>
-    <div class="cutlines">
-      <canvas id="cutCanvas"></canvas>
-    </div>
-    <div class="sheet" id="cardSheet"></div>
+    ${pages.map((page, index) => `
+      <div class="sheet">
+        <div class="cutlines"><canvas id="canvas${index}" width="793" height="1122"></canvas></div>
+        <div class="grid">
+          ${page.map(img => `<img src="${img}" />`).join('')}
+        </div>
+      </div>
+    `).join('')}
 
     <script>
-      const images = ${JSON.stringify(cachedImages)};
-      const sheet = document.getElementById('cardSheet');
+      const pxPerMM = 793 / 210; // Based on 96 DPI at 210mm width
 
-      images.forEach(card => {
-        for (let i = 0; i < card.quantity; i++) {
-          const img = document.createElement('img');
-          img.src = card.img;
-          img.alt = card.name;
-          sheet.appendChild(img);
-        }
-      });
+      const leftMargin = 10.5 * pxPerMM;
+      const topMargin = 16.5 * pxPerMM;
+      const cardW = 63 * pxPerMM;
+      const cardH = 88 * pxPerMM;
 
-      // Setup canvas after DOM is ready
-      window.onload = () => {
-        const canvas = document.getElementById('cutCanvas');
-        const dpi = 96;
-        canvas.width = Math.round((210 / 25.4) * dpi); // ~794
-        canvas.height = Math.round((297 / 25.4) * dpi); // ~1123
+      const pageCount = ${pages.length};
 
-        const ctx = canvas.getContext('2d');
+      for (let p = 0; p < pageCount; p++) {
+        const canvas = document.getElementById("canvas" + p);
+        const ctx = canvas.getContext("2d");
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle = '#00FF00';
+        ctx.strokeStyle = "#00FF00";
         ctx.lineWidth = 0.5;
 
-        const pxPerMM = dpi / 25.4;
-        const cardW = 63 * pxPerMM;
-        const cardH = 88 * pxPerMM;
-        const leftMargin = 10.5 * pxPerMM;
-        const topMargin = 16.5 * pxPerMM;
-
-        // Vertical cut lines
         for (let i = 0; i <= 3; i++) {
           const x = leftMargin + i * cardW;
           ctx.beginPath();
@@ -171,18 +176,16 @@ function openPrintView() {
           ctx.stroke();
         }
 
-        // Horizontal cut lines
-        for (let i = 0; i <= 3; i++) {
-          const y = topMargin + i * cardH;
+        for (let j = 0; j <= 3; j++) {
+          const y = topMargin + j * cardH;
           ctx.beginPath();
           ctx.moveTo(0, y);
           ctx.lineTo(canvas.width, y);
           ctx.stroke();
         }
+      }
 
-        // Print only after layout is stable
-        setTimeout(() => window.print(), 100);
-      };
+      window.onload = () => window.print();
     </script>
   </body>
   </html>
@@ -191,8 +194,6 @@ function openPrintView() {
   win.document.write(html);
   win.document.close();
 }
-
-
 
 // Icon rotation
 const spinnerIcon = document.getElementById('spinnerIcon');
