@@ -68,47 +68,74 @@ function openPrintView() {
             margin: 0;
             padding: 0;
           }
-          .page {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            grid-auto-rows: 94mm;
-            gap: 5mm;
-            padding: 5mm;
-            page-break-inside: avoid;
+          .sheet {
+            width: 210mm;
+            height: 297mm;
+            page-break-after: always;
+            position: relative;
           }
-          img {
+          .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 63mm);
+            grid-template-rows: repeat(3, 88mm);
+            position: absolute;
+            top: 16.5mm;
+            left: 6mm;
+          }
+          .cell {
             width: 63mm;
             height: 88mm;
-            object-fit: cover;
+            position: relative;
+            box-sizing: border-box;
           }
-        }
-        body {
-          background: white;
-          color: black;
-        }
-        .page {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          grid-auto-rows: 94mm;
-          gap: 5mm;
-          padding: 5mm;
-        }
-        img {
-          width: 63mm;
-          height: 88mm;
-          object-fit: cover;
+          .cell img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+          }
+          .cut-line {
+            position: absolute;
+            border: 0.1mm dashed black;
+            pointer-events: none;
+          }
+          .cut-line.h {
+            width: 210mm;
+            height: 0;
+            top: calc(var(--y) * 88mm + 16.5mm);
+            left: 0;
+            border-top: 0.1mm dashed black;
+          }
+          .cut-line.v {
+            height: 297mm;
+            width: 0;
+            left: calc(var(--x) * 63mm + 6mm);
+            top: 0;
+            border-left: 0.1mm dashed black;
+          }
         }
       </style>
     </head>
     <body>
-      <div class="page">
-        ${cachedImages.map(card =>
-          Array(card.quantity).fill(`<img src="${card.img}" alt="${card.name}" />`).join('')
-        ).join('')}
-      </div>
-      <script>
-        window.onload = () => window.print();
-      </script>
+      ${(() => {
+        const pages = [];
+        let index = 0;
+        while (index < cachedImages.length) {
+          const cards = cachedImages.slice(index, index + 9);
+          index += 9;
+          pages.push(`
+            <div class="sheet">
+              <div class="grid">
+                ${cards.map(card => `<div class="cell"><img src="${card.img}" alt="${card.name}"></div>`).join('')}
+              </div>
+              ${[1, 2].map(y => `<div class="cut-line h" style="--y:${y}"></div>`).join('')}
+              ${[1, 2].map(x => `<div class="cut-line v" style="--x:${x}"></div>`).join('')}
+            </div>
+          `);
+        }
+        return pages.join('');
+      })()}
+      <script>window.onload = () => window.print();</script>
     </body>
     </html>
   `;
@@ -116,3 +143,4 @@ function openPrintView() {
   win.document.write(html);
   win.document.close();
 }
+
