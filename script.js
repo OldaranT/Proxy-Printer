@@ -115,26 +115,33 @@ function openPrintView() {
       </style>
     </head>
     <body>
-      <div class="sheet">
-        ${cachedImages.map(card =>
-          Array(card.quantity).fill(`<img src="${card.img}" alt="${card.name}"/>`).join('')
-        ).join('')}
-        <div class="cutlines">
-          <canvas width="567" height="999"></canvas>
-        </div>
+      <div class="sheet" id="sheet"></div>
+      <div class="cutlines">
+        <canvas width="567" height="999"></canvas>
       </div>
 
       <script>
+        const cards = ${JSON.stringify(cachedImages)};
+        const sheet = document.getElementById('sheet');
+
+        cards.forEach(card => {
+          for (let i = 0; i < card.quantity; i++) {
+            const img = document.createElement('img');
+            img.src = card.img;
+            img.alt = card.name;
+            sheet.appendChild(img);
+          }
+        });
+
         const canvas = document.querySelector('.cutlines canvas');
         const ctx = canvas.getContext('2d');
         ctx.strokeStyle = "#00ff00";
         ctx.lineWidth = 0.5;
 
-        const mmToPx = mm => mm * (canvas.width / (63 * 3)); // scale to canvas width
+        const mmToPx = mm => mm * (canvas.width / (63 * 3));
         const cardW = mmToPx(63);
         const cardH = mmToPx(88);
 
-        // Draw vertical lines
         for (let i = 1; i < 3; i++) {
           const x = i * cardW;
           ctx.beginPath();
@@ -143,7 +150,6 @@ function openPrintView() {
           ctx.stroke();
         }
 
-        // Draw horizontal lines
         for (let i = 1; i < 3; i++) {
           const y = i * cardH;
           ctx.beginPath();
@@ -152,7 +158,9 @@ function openPrintView() {
           ctx.stroke();
         }
 
-        window.onload = () => window.print();
+        setTimeout(() => {
+          window.print();
+        }, 500);
       </script>
     </body>
     </html>
