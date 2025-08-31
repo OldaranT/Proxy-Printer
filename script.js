@@ -28,7 +28,7 @@ const CONFIG = {
   },
 
   // Back image for duplex printing
-  BACK_IMAGE_URL: 'https://cdn.imgchest.com/files/7kzcajvdwp7.png',
+  BACK_IMAGE_URL: 'https://i.imgur.com/LdOBU1I.jpeg',
 
   // Canvas pixel density (used to size the canvases to the physical page)
   CANVAS_DPI: 96                   // pixels per inch for the canvas drawing of cutlines & bg panel
@@ -388,15 +388,47 @@ function openPrintView() {
   win.document.close();
 }
 
-// Icon rotation
+// ================= Spinner icon + rotating messages =================
 const spinnerIcon = document.getElementById('spinnerIcon');
+// IMPORTANT: match filename case with your actual files
 const iconPaths = [
-  'public/icons/FF-ICON-1.png',
-  'public/icons/FF-ICON-2.png',
-  'public/icons/FF-ICON-3.png'
+  'public/icons/FF-ICON-1.PNG',
+  'public/icons/FF-ICON-2.PNG',
+  'public/icons/FF-ICON-3.PNG'
 ];
+
+// Lines that rotate along with the icon
+const quips = [
+  'Summoning proxies',
+  'Shuffling decklists',
+  'Fetching art & frames'
+];
+const hints = [
+  'We’re scraping your Archidekt/Moxfield deck — bigger decks can take a bit longer.',
+  'Counting card quantities & images — hang tight!',
+  'Optimizing images for crisp print — almost there.'
+];
+
+function updateLoadingCopy(index) {
+  const quipEl = document.querySelector('#loading .spinner-copy .quip');
+  const hintEl = document.querySelector('#loading .spinner-copy .hint');
+  if (quipEl) {
+    // preserve the animated dots
+    quipEl.innerHTML = `${quips[index % quips.length]} <span class="dots"><span>•</span><span>•</span><span>•</span></span>`;
+  }
+  if (hintEl) {
+    hintEl.textContent = hints[index % hints.length];
+  }
+}
+
+// Set initial state
 let currentIconIndex = 0;
+if (spinnerIcon) spinnerIcon.src = iconPaths[currentIconIndex];
+updateLoadingCopy(currentIconIndex);
+
+// Rotate every 5s: icon + text together
 setInterval(() => {
   currentIconIndex = (currentIconIndex + 1) % iconPaths.length;
   if (spinnerIcon) spinnerIcon.src = iconPaths[currentIconIndex];
+  updateLoadingCopy(currentIconIndex);
 }, 5000);
