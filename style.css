@@ -34,7 +34,6 @@
 }
 
 /* ================= Page Background ================= */
-/* remove the background from body itself */
 body{
   margin:0;
   font-family: system-ui,-apple-system,Segoe UI,Roboto,Inter,Ubuntu,'Helvetica Neue',Arial,sans-serif;
@@ -46,28 +45,24 @@ body{
 body::before{
   content:"";
   position: fixed;
-  inset: 0;                 /* cover the viewport */
-  z-index: -1;              /* sit behind all content */
+  inset: 0;
+  z-index: -1;
   pointer-events: none;
-
-  /* gradients that never “run out” */
   background:
     radial-gradient(ellipse farthest-corner at 85% -10%,
       rgba(33,160,106,.14) 0%, rgba(33,160,106,0) 60%),
     radial-gradient(ellipse farthest-corner at -10% 110%,
       rgba(15,61,46,.12) 0%, rgba(15,61,46,0) 55%),
     linear-gradient(180deg,#f9fcfa 0%,#f0f7f3 60%,#8da094 100%);
-
   background-repeat: no-repeat, no-repeat, no-repeat;
-  background-size: cover, cover, cover;   /* fill viewport at all sizes */
-  background-attachment: fixed, fixed, fixed; /* belt & suspenders */
+  background-size: cover, cover, cover;
+  background-attachment: fixed, fixed, fixed;
 }
 
 /* ================= Container & Brand ================= */
 .container{max-width:980px;margin:36px auto 40px;padding:0 16px;}
 .brand{margin-bottom:16px}
 
-/* compact row with logo + text */
 .brand-row{
   display:flex;
   align-items:center;
@@ -82,8 +77,6 @@ body::before{
   border:0;
   border-radius:50%;
   background:transparent;
-
-  /* subtle, natural shadow */
   box-shadow:
     0 8px 22px rgba(0,0,0,.22),
     0 2px 6px rgba(0,0,0,.18);
@@ -108,7 +101,6 @@ body::before{
   letter-spacing:.2px;
 }
 
-/* Responsive: make title a bit smaller on phones */
 @media (max-width: 520px){
   .brand-title{ font-size:28px }
 }
@@ -184,7 +176,7 @@ body::before{
   .toggle .state-on, .toggle .state-off{opacity:1}
 }
 
-/* Switch (track & thumb) — toned down roundness */
+/* Switch (track & thumb) */
 .switch{
   position:relative; display:inline-block; width:66px; height:36px; flex:0 0 auto;
 }
@@ -225,7 +217,7 @@ body::before{
   position:fixed; inset:0; backdrop-filter:saturate(120%) blur(1.5px);
   background: rgba(255,255,255,.6);
   display:flex;
-  flex-direction: column;   /* stack spinner above text */
+  flex-direction: column;
   align-items:center;
   justify-content:center;
   z-index:9999;
@@ -244,7 +236,6 @@ body::before{
 }
 @keyframes spin{ to{ transform: rotate(360deg) } }
 
-/* Loading overlay copy */
 .spinner-copy{
   text-align:center;
   max-width: 520px;
@@ -266,7 +257,6 @@ body::before{
   color: #2d4a40;
   opacity: .9;
 }
-/* Animated dots after "Summoning proxies" */
 .dots{
   display:inline-block;
   min-width: 1.6em;
@@ -293,24 +283,49 @@ body::before{
   display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
   gap:12px; margin-top:14px;
 }
-.card-grid .card{
-  position: relative; /* for qty badge */
-  aspect-ratio:63/88;
-  background:#f4f7f5; border:1px solid #e7eee9; border-radius:var(--radius-ssm);
-  overflow:hidden; box-shadow: 0 2px 8px rgba(0,0,0,.06);
-}
-.card-grid .card img{ width:100%; height:100%; object-fit:cover; display:block; }
 
-/* quantity badge (overview only) */
+/* Card tile: absolute image layer + overlay badge */
+.card-grid .card{
+  position: relative;                 /* positioning context */
+  aspect-ratio:63/88;
+  background:#f4f7f5;
+  border:1px solid #e7eee9;
+  border-radius:var(--radius-ssm);
+  overflow:hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  z-index: 0;                         /* create stacking context */
+}
+
+/* Image fills tile below overlays */
+.card-grid .card img{
+  position: absolute;
+  inset: 0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+  z-index: 1;
+}
+
+/* Quantity badge — forced size so DevTools shows px, and stacks above image */
 .qty-badge{
   position:absolute;
+  z-index: 2;
+  top:178px;
   right:6px;
-  top:6px;
-  padding: 2px 8px;
+
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+
+  min-width: 24px;
+  height: 20px;
+  padding: 0 8px;
+
   border-radius: var(--radius-ssm);
   font-size: 12px;
-  line-height: 18px;
   font-weight: 800;
+  line-height: 1;
   color: #fff;
 
   background: linear-gradient(180deg, var(--forest-500), var(--forest-700));
@@ -318,11 +333,11 @@ body::before{
   box-shadow:
     0 4px 10px rgba(0,0,0,.18),
     inset 0 0 0 1px rgba(255,255,255,.08);
+
   user-select: none;
   pointer-events: none; /* purely decorative */
 }
 
 /* optional: hide badge when quantity is 1 */
-.qty-badge { display: none; }
 .card[aria-label*="quantity 1"] .qty-badge { display: none; }
 
