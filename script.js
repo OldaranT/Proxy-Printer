@@ -30,82 +30,21 @@ const CONFIG = {
   // Back image for duplex printing
   BACK_IMAGE_URL: 'https://i.imgur.com/LdOBU1I.jpeg',
 
-  // Canvas pixel density (used to size the canvas to the physical page)
-  CANVAS_DPI: 96                   // pixels per inch for the canvas drawing of cutlines
+  // Canvas pixel density (used to size the canvases to the physical page)
+  CANVAS_DPI: 96                   // pixels per inch for the canvas drawing of cutlines & bg panel
 };
 // ----------------------------------------
 
 let cachedImages = [];
 let cachedDeckName = "Deck";
 
+// The new UI uses slider-style checkboxes with these IDs:
+// cutLinesToggle, spaceBetweenToggle, backSideToggle, blackBackgroundToggle, pageSizeToggle
+
 document.addEventListener('DOMContentLoaded', () => {
-  const cutlineToggleWrapper = document.getElementById('cutlineToggleWrapper');
-  const cutlineToggleCheckbox = document.getElementById('cutlineToggle');
-
-  const spaceBetweenToggleWrapper = document.getElementById('spaceBetweenToggleWrapper');
-  const spaceBetweenToggleCheckbox = document.getElementById('spaceBetweenToggle');
-
-  const showBackgroundToggleWrapper = document.getElementById('showBackgroundToggleWrapper');
-  const showBackgroundToggleCheckbox = document.getElementById('showBackgroundToggle');
-
-  const pageSizeToggleWrapper = document.getElementById('pageSizeToggleWrapper');
-  const pageSizeToggleCheckbox = document.getElementById('pageSizeToggle');
-
-  const blackBackgroundToggleWrapper = document.getElementById('blackBackgroundToggleWrapper');
-  const blackBackgroundToggleCheckbox = document.getElementById('blackBackgroundToggle');
-
-  // Wrapper click -> toggle checkbox + active class
-  if (cutlineToggleWrapper && cutlineToggleCheckbox) {
-    cutlineToggleWrapper.addEventListener('click', () => {
-      cutlineToggleCheckbox.checked = !cutlineToggleCheckbox.checked;
-      cutlineToggleWrapper.classList.toggle('active', cutlineToggleCheckbox.checked);
-    });
-  }
-
-  if (spaceBetweenToggleWrapper && spaceBetweenToggleCheckbox) {
-    spaceBetweenToggleWrapper.addEventListener('click', () => {
-      spaceBetweenToggleCheckbox.checked = !spaceBetweenToggleCheckbox.checked;
-      spaceBetweenToggleWrapper.classList.toggle('active', spaceBetweenToggleCheckbox.checked);
-    });
-  }
-
-  if (showBackgroundToggleWrapper && showBackgroundToggleCheckbox) {
-    showBackgroundToggleWrapper.addEventListener('click', () => {
-      showBackgroundToggleCheckbox.checked = !showBackgroundToggleCheckbox.checked;
-      showBackgroundToggleWrapper.classList.toggle('active', showBackgroundToggleCheckbox.checked);
-    });
-  }
-
-  if (pageSizeToggleWrapper && pageSizeToggleCheckbox) {
-    pageSizeToggleWrapper.addEventListener('click', () => {
-      pageSizeToggleCheckbox.checked = !pageSizeToggleCheckbox.checked;
-      pageSizeToggleWrapper.classList.toggle('active', pageSizeToggleCheckbox.checked);
-    });
-  }
-
-  if (blackBackgroundToggleWrapper && blackBackgroundToggleCheckbox) {
-    blackBackgroundToggleWrapper.addEventListener('click', () => {
-      blackBackgroundToggleCheckbox.checked = !blackBackgroundToggleCheckbox.checked;
-      blackBackgroundToggleWrapper.classList.toggle('active', blackBackgroundToggleCheckbox.checked);
-    });
-  }
-
-  // Ensure initial state is synced
-  if (cutlineToggleWrapper && cutlineToggleCheckbox) {
-    cutlineToggleWrapper.classList.toggle('active', cutlineToggleCheckbox.checked);
-  }
-  if (spaceBetweenToggleWrapper && spaceBetweenToggleCheckbox) {
-    spaceBetweenToggleWrapper.classList.toggle('active', spaceBetweenToggleCheckbox.checked);
-  }
-  if (showBackgroundToggleWrapper && showBackgroundToggleCheckbox) {
-    showBackgroundToggleWrapper.classList.toggle('active', showBackgroundToggleCheckbox.checked);
-  }
-  if (pageSizeToggleWrapper && pageSizeToggleCheckbox) {
-    pageSizeToggleWrapper.classList.toggle('active', pageSizeToggleCheckbox.checked);
-  }
-  if (blackBackgroundToggleWrapper && blackBackgroundToggleCheckbox) {
-    blackBackgroundToggleWrapper.classList.toggle('active', blackBackgroundToggleCheckbox.checked);
-  }
+  // Nothing special needed for slider toggles:
+  // styling is handled purely by CSS via :checked.
+  // This hook is kept in case you want to attach listeners later.
 });
 
 function extractDeckUrl(url) {
@@ -200,10 +139,10 @@ function choosePageGeometry(sizeKey, gapmm) {
 /**
  * Print view with options:
  * - spaceBetweenToggle: adds GAP_WHEN_ENABLED_MM gaps between cards (cards remain 63x88mm).
- * - showBackgroundToggle: inserts a matching "backs" page after each fronts page.
+ * - backSideToggle: inserts a matching "backs" page after each fronts page.
  *   Backs are ALWAYS full-page grids (9 for A4, 18 for A3) and perfectly centered.
- * - blackBackgroundToggle: fills the entire page background in black (lowest z-index layer).
- * - cutlineToggle: per-card corner crop marks (2mm lines, start 0.5mm from edges).
+ * - blackBackgroundToggle: fills the entire page background using a CANVAS at the lowest z-index.
+ * - cutLinesToggle: per-card corner crop marks (2mm lines, start 0.5mm from edges).
  * - pageSizeToggle: toggles between A4 (unchecked) and A3 (checked).
  * - Auto orientation: chooses portrait/landscape to fit the MOST cards per page.
  */
@@ -211,11 +150,11 @@ function openPrintView() {
   if (!cachedImages.length) return;
 
   const deckName = cachedDeckName;
-  const showCutlines = document.getElementById('cutlineToggle')?.checked;
+  const showCutlines   = document.getElementById('cutLinesToggle')?.checked;
   const addSpaceBetween = document.getElementById('spaceBetweenToggle')?.checked;
-  const addBackground = document.getElementById('showBackgroundToggle')?.checked;
-  const useA3 = document.getElementById('pageSizeToggle')?.checked || false;
-  const useBlackBg = document.getElementById('blackBackgroundToggle')?.checked || false;
+  const addBackground   = document.getElementById('backSideToggle')?.checked;
+  const useA3           = document.getElementById('pageSizeToggle')?.checked || false;
+  const useBlackBg      = document.getElementById('blackBackgroundToggle')?.checked || false;
 
   const sizeKey = useA3 ? 'A3' : CONFIG.DEFAULT_PAGE;
 
@@ -244,7 +183,7 @@ function openPrintView() {
   const CANVAS_W_PX = Math.round((PAGE_W / MM_PER_IN) * CONFIG.CANVAS_DPI);
   const CANVAS_H_PX = Math.round((PAGE_H / MM_PER_IN) * CONFIG.CANVAS_DPI);
 
-  const cards = cachedImages.flatMap(card => Array(card.quantity).fill(card.img));
+  const cards = cachedImages.flatMap(card => Array(card.quantity ?? 1).fill(card.img));
   const perPage = GRID_COLS * GRID_ROWS;
 
   const titleBits = [
@@ -254,7 +193,7 @@ function openPrintView() {
     showCutlines ? '(cutlines)' : '(no cutlines)',
     addSpaceBetween ? `(${GAP}mm gaps)` : '(tight)',
     addBackground ? '(with backs)' : '',
-    useBlackBg ? '(black page bg)' : ''
+    useBlackBg ? '(black page bg panel)' : ''
   ].filter(Boolean);
   const title = titleBits.join(' ');
 
@@ -263,30 +202,33 @@ function openPrintView() {
   function buildPageHTML(imgSrcs, isBack = false) {
     // FRONT: use actual chunk images (could be < perPage)
     // BACK: always fill the entire page with background backs (exactly perPage)
-    const imgs = isBack
-      ? new Array(perPage).fill(CONFIG.BACK_IMAGE_URL)
-      : imgSrcs;
-
+    const imgs = isBack ? new Array(perPage).fill(CONFIG.BACK_IMAGE_URL) : imgSrcs;
     const imagesHTML = imgs.map(src => `<img src="${src}" alt="${isBack ? 'Card back' : 'Card front'}" />`).join('');
-
-    // lowest layer page background div (black or white)
-    const pageBgStyle = useBlackBg ? 'background:#000;' : 'background:#fff;';
 
     return `
       <div class="page ${isBack ? 'back' : 'front'}">
-        <div class="page-bg" style="${pageBgStyle}"></div>
+        <!-- Lowest layer: a CANVAS we fill (black/transparent) to ensure PDF includes it -->
+        <canvas class="page-fill" width="${CANVAS_W_PX}" height="${CANVAS_H_PX}"
+                style="position:absolute; left:0; top:0; width:${PAGE_W}mm; height:${PAGE_H}mm; z-index:0;"></canvas>
+
+        <!-- Centered sheet of cards -->
         <div class="sheet" style="
           top:${MARGIN_T}mm;
           left:${MARGIN_L}mm;
           width:${SHEET_W}mm;
           height:${SHEET_H}mm;
+          display:grid;
           grid-template-columns: repeat(${GRID_COLS}, ${CARD_W}mm);
           grid-template-rows: repeat(${GRID_ROWS}, ${CARD_H}mm);
-          gap:${GAP}mm;">
+          gap:${GAP}mm;
+          z-index:2;">
           ${imagesHTML}
         </div>
-        <div class="cutlines" style="display:${showCutlines ? 'block' : 'none'};">
-          <canvas width="${CANVAS_W_PX}" height="${CANVAS_H_PX}"></canvas>
+
+        <!-- Cutlines overlay -->
+        <div class="cutlines" style="position:absolute; inset:0; z-index:3; pointer-events:none; display:${showCutlines ? 'block' : 'none'};">
+          <canvas width="${CANVAS_W_PX}" height="${CANVAS_H_PX}"
+                  style="position:absolute; left:0; top:0; width:${PAGE_W}mm; height:${PAGE_H}mm;"></canvas>
         </div>
       </div>
     `;
@@ -314,23 +256,6 @@ function openPrintView() {
           page-break-after: always;
           overflow: hidden;
         }
-        /* lowest layer background (toggleable black/white) */
-        .page-bg {
-          position: absolute;
-          inset: 0;
-          z-index: 0; /* backest layer */
-        }
-        .sheet {
-          position: absolute;
-          display: grid;
-          z-index: 2; /* above page-bg */
-        }
-        .cutlines {
-          position: absolute;
-          inset: 0;
-          z-index: 3; /* above everything for visibility */
-          pointer-events: none;
-        }
         .sheet img {
           width: ${CARD_W}mm;
           height: ${CARD_H}mm;
@@ -344,7 +269,8 @@ function openPrintView() {
       <script>
         document.title = ${JSON.stringify(title)};
 
-        // Cutline config (injected constants)
+        // Injected constants
+        const USE_BLACK_BG = ${useBlackBg ? 'true' : 'false'};
         const OFFSET_MM = ${CONFIG.CUTLINE.OFFSET_FROM_EDGE_MM};
         const LENGTH_MM = ${CONFIG.CUTLINE.LENGTH_MM};
         const STROKE_PX = ${CONFIG.CUTLINE.STROKE_PX};
@@ -357,6 +283,19 @@ function openPrintView() {
         const GAP = ${GAP};
         const GRID_COLS = ${GRID_COLS};
         const GRID_ROWS = ${GRID_ROWS};
+
+        // Fill the bottom page canvas (ensures background is part of PDF content)
+        document.querySelectorAll('.page-fill').forEach(canvas => {
+          const ctx = canvas.getContext('2d');
+          if (USE_BLACK_BG) {
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          } else {
+            // keep transparent; or uncomment to force white
+            // ctx.fillStyle = '#FFFFFF';
+            // ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }
+        });
 
         function drawCornerMarks(ctx, x, y, w, h, pxPerMM_X, pxPerMM_Y) {
           const offX = OFFSET_MM * pxPerMM_X;
@@ -400,7 +339,7 @@ function openPrintView() {
           ctx.stroke();
         }
 
-        // Draw for each page (uses the sheet's inline top/left in mm for exact alignment)
+        // Draw cutlines for each page (uses the sheet's inline top/left in mm for exact alignment)
         document.querySelectorAll('.cutlines canvas').forEach(canvas => {
           const ctx = canvas.getContext('2d');
           const pxPerMM_X = canvas.width / PAGE_W;
