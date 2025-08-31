@@ -1,3 +1,5 @@
+// script.js
+
 let cachedImages = [];
 let cachedDeckName = "Deck";
 
@@ -10,25 +12,37 @@ document.addEventListener('DOMContentLoaded', () => {
   const showBackgroundToggleCheckbox = document.getElementById('showBackgroundToggle');
 
   // Wrapper click -> toggle checkbox + active class
-  cutlineToggleWrapper.addEventListener('click', () => {
-    cutlineToggleCheckbox.checked = !cutlineToggleCheckbox.checked;
+  if (cutlineToggleWrapper && cutlineToggleCheckbox) {
+    cutlineToggleWrapper.addEventListener('click', () => {
+      cutlineToggleCheckbox.checked = !cutlineToggleCheckbox.checked;
+      cutlineToggleWrapper.classList.toggle('active', cutlineToggleCheckbox.checked);
+    });
+  }
+
+  if (spaceBetweenToggleWrapper && spaceBetweenToggleCheckbox) {
+    spaceBetweenToggleWrapper.addEventListener('click', () => {
+      spaceBetweenToggleCheckbox.checked = !spaceBetweenToggleCheckbox.checked;
+      spaceBetweenToggleWrapper.classList.toggle('active', spaceBetweenToggleCheckbox.checked);
+    });
+  }
+
+  if (showBackgroundToggleWrapper && showBackgroundToggleCheckbox) {
+    showBackgroundToggleWrapper.addEventListener('click', () => {
+      showBackgroundToggleCheckbox.checked = !showBackgroundToggleCheckbox.checked;
+      showBackgroundToggleWrapper.classList.toggle('active', showBackgroundToggleCheckbox.checked);
+    });
+  }
+
+  // Ensure initial state is synced (fixed bad var name)
+  if (cutlineToggleWrapper && cutlineToggleCheckbox) {
     cutlineToggleWrapper.classList.toggle('active', cutlineToggleCheckbox.checked);
-  });
-
-  spaceBetweenToggleWrapper.addEventListener('click', () => {
-    spaceBetweenToggleCheckbox.checked = !spaceBetweenToggleCheckbox.checked;
+  }
+  if (spaceBetweenToggleWrapper && spaceBetweenToggleCheckbox) {
     spaceBetweenToggleWrapper.classList.toggle('active', spaceBetweenToggleCheckbox.checked);
-  });
-
-  showBackgroundToggleWrapper.addEventListener('click', () => {
-    showBackgroundToggleCheckbox.checked = !showBackgroundToggleCheckbox.checked;
+  }
+  if (showBackgroundToggleWrapper && showBackgroundToggleCheckbox) {
     showBackgroundToggleWrapper.classList.toggle('active', showBackgroundToggleCheckbox.checked);
-  });
-
-  // Ensure initial state is synced
-  cutlineToggleWrapper.classList.toggle('active', cutlineToggleCheckbox.checked);
-  spaceBetweenToggleWrapper.classList.toggle('active', spaceBetweenToggleCheckbox.checked);
-  showBackgroundToggleWrapper.classList.toggle('active', showBackgroundToggleCheckbox.checked);
+  }
 });
 
 function extractDeckUrl(url) {
@@ -95,10 +109,11 @@ async function loadDeck() {
 }
 
 /**
- * Print view with two new options:
+ * Print view with options:
  * - addSpaceBetween (checkbox #spaceBetweenToggle): adds uniform gaps between cards (cards remain 63x88mm).
  * - addBackground (checkbox #showBackgroundToggle): inserts a matching "backs" page after every fronts page,
  *   using public/images/BACKGROUND.PNG. Layout & cutlines are identical so duplex prints align.
+ * - Cutlines: rectangles around EACH card (all four sides).
  */
 function openPrintView() {
   if (!cachedImages.length) return;
@@ -115,7 +130,7 @@ function openPrintView() {
   const CARD_H = 88;            // card height (mm)
   const MARGIN_L = 10.5;        // left margin (mm)
   const MARGIN_T = 13.5;        // top margin (mm)
-  const GAP = addSpaceBetween ? 3 : 0; // uniform gap between cards (mm) — tweak if you want more/less
+  const GAP = addSpaceBetween ? 3 : 0; // uniform gap between cards (mm)
 
   // Derived sheet dimensions (3x3 grid)
   const SHEET_W = 3 * CARD_W + 2 * GAP;
@@ -132,10 +147,13 @@ function openPrintView() {
 
   const win = window.open('', '_blank');
 
+  // Build absolute URL for BACKGROUND.PNG so it actually loads
+  const backgroundAbsUrl = new URL('public/images/BACKGROUND.PNG', window.location.href).href;
+
   // Helper to build one "front" page (or "back" page if isBack=true)
   function buildPageHTML(imgSrcs, isBack = false) {
     // for back pages use the BACKGROUND.PNG for all 9 slots
-    const imgs = isBack ? new Array(imgSrcs.length).fill('public/images/BACKGROUND.PNG') : imgSrcs;
+    const imgs = isBack ? new Array(imgSrcs.length).fill(backgroundAbsUrl) : imgSrcs;
     const imagesHTML = imgs.map(src => `<img src="${src}" alt="${isBack ? 'Card back' : 'Card front'}" />`).join('');
 
     return `
@@ -179,7 +197,7 @@ function openPrintView() {
         .page {
           position: relative;
           width: ${PAGE_W}mm;
-          height: ${PAGE_H}mm;    /* corrected to full A4 height */
+          height: ${PAGE_H}mm;
           page-break-after: always;
         }
         .cutlines {
@@ -206,7 +224,8 @@ function openPrintView() {
       <script>
         document.title = ${JSON.stringify(title)};
 
-        // Draw cutlines aligned to the grid, respecting margins and gaps
+        // Draw rectangular cutlines around EVERY card (all four sides),
+        // aligned to the grid and respecting margins and gaps.
         const canvases = document.querySelectorAll('.cutlines canvas');
         canvases.forEach(canvas => {
           const ctx = canvas.getContext('2d');
@@ -223,22 +242,13 @@ function openPrintView() {
           ctx.strokeStyle = '#00ff00';
           ctx.lineWidth = 1.5;
 
-          // Vertical grid boundaries (0..3)
-          for (let i = 0; i <= 3; i++) {
-            const x = left + i * cardW + (i > 0 ? i * gapX : 0);
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, canvas.height);
-            ctx.stroke();
-          }
-
-          // Horizontal grid boundaries (0..3)
-          for (let j = 0; j <= 3; j++) {
-            const y = top + j * cardH + (j > 0 ? j * gapY : 0);
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(canvas.width, y);
-            ctx.stroke();
+          // 3x3 cells -> draw a rectangle for each card
+          for (let row = 0; row < 3; row++) {
+            for (let col = 0; col < 3; col++) {
+              const x = left + col * (cardW + gapX);
+              const y = top + row * (cardH + gapY);
+              ctx.strokeRect(x, y, cardW, cardH);
+            }
           }
         });
 
@@ -253,7 +263,7 @@ function openPrintView() {
   win.document.close();
 }
 
-// Icon rotation (unchanged)
+// Icon rotation
 const spinnerIcon = document.getElementById('spinnerIcon');
 const iconPaths = [
   'public/icons/FF-ICON-1.png',
