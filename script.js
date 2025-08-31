@@ -23,10 +23,7 @@ const CONFIG = {
   // UPDATED back image source
   BACK_IMAGE_URL: 'https://cdn.imgchest.com/files/7kzcajvdwp7.png',
 
-  CANVAS_DPI: 96,
-
-  // Show category labels on print pages (fronts only)
-  PRINT_CATEGORY_LABELS: true
+  CANVAS_DPI: 96
 };
 // ----------------------------------------
 
@@ -287,7 +284,7 @@ async function loadDeck() {
     // Optional order hint from server
     categoryOrderFromServer = Array.isArray(data.categoryOrder) ? data.categoryOrder : [];
 
-    // IMPORTANT CHANGE: keep category and clamp quantities (also safe for DFCs backed by server changes)
+    // Keep category for overview; quantities clamped
     cachedImages = data.images.map((card, i) => ({
       ...card,
       quantity: clampQty(card.quantity ?? 1),
@@ -329,7 +326,7 @@ function choosePageGeometry(sizeKey, gapmm) {
   return (b.cols * b.rows) > (a.cols * a.rows) ? landscape : portrait;
 }
 
-// Build all print pages, grouped by category, skipping ×0
+// Build print pages COMPACTLY — categories do NOT influence layout
 function openPrintView() {
   if (!cachedImages.length) return;
 
@@ -362,12 +359,21 @@ function openPrintView() {
   const CANVAS_W_PX = Math.round((PAGE_W / MM_PER_IN) * CONFIG.CANVAS_DPI);
   const CANVAS_H_PX = Math.round((PAGE_H / MM_PER_IN) * CONFIG.CANVAS_DPI);
 
-  const grouped = groupByCategory(cachedImages);
+  // 🔑 Flatten all cards with qty > 0, in their current deck order
+  const imgsAll = [];
+  cachedImages.forEach(card => {
+    const q = clampQty(card.quantity);
+    if (q > 0) {
+      for (let i = 0; i < q; i++) imgsAll.push(card.img);
+    }
+  });
+
+  const perPage = GRID_COLS * GRID_ROWS;
 
   const titleBits = [
     deckName,
     `${sizeKey} ${ORIENT}`,
-    `${GRID_COLS * GRID_ROWS}/page`,
+    `${perPage}/page`,
     showCutlines ? '(cutlines)' : '(no cutlines)',
     addSpaceBetween ? `(${GAP}mm gaps)` : '(tight)',
     addBackground ? '(with backs)' : '',
@@ -377,23 +383,14 @@ function openPrintView() {
 
   const win = window.open('', '_blank');
 
-  function buildPageHTML(imgSrcs, opts) {
-    const { isBack, categoryName } = opts;
-    const perPage = GRID_COLS * GRID_ROWS;
-
+  function buildPageHTML(imgSrcs, isBack = false) {
     const imgs = isBack ? new Array(perPage).fill(CONFIG.BACK_IMAGE_URL) : imgSrcs;
     const imagesHTML = imgs.map(src => `<img src="${src}" alt="${isBack ? 'Card back' : 'Card front'}" />`).join('');
-
-    const categoryLabel = (CONFIG.PRINT_CATEGORY_LABELS && !isBack && categoryName)
-      ? `<div class="page-label">${escapeHTML(categoryName)}</div>`
-      : '';
 
     return `
       <div class="page ${isBack ? 'back' : 'front'}">
         <canvas class="page-fill" width="${CANVAS_W_PX}" height="${CANVAS_H_PX}"
           style="position:absolute; left:0; top:0; width:${PAGE_W}mm; height:${PAGE_H}mm; z-index:-5;"></canvas>
-
-        ${categoryLabel}
 
         <div class="sheet" style="
           position:absolute;
@@ -417,22 +414,13 @@ function openPrintView() {
     `;
   }
 
-  const perPage = GRID_COLS * GRID_ROWS;
+  // Build compact pages (fronts + optional backs)
   const pages = [];
-
-  grouped.forEach(([category, cards]) => {
-    const imgs = cards.flatMap(card => {
-      const q = clampQty(card.quantity);
-      return q > 0 ? new Array(q).fill(card.img) : [];
-    });
-    if (imgs.length === 0) return;
-
-    for (let i = 0; i < imgs.length; i += perPage) {
-      const chunk = imgs.slice(i, i + perPage);
-      pages.push(buildPageHTML(chunk, { isBack: false, categoryName: category }));
-      if (addBackground) pages.push(buildPageHTML(chunk, { isBack: true, categoryName: category }));
-    }
-  });
+  for (let i = 0; i < imgsAll.length; i += perPage) {
+    const chunk = imgsAll.slice(i, i + perPage);
+    pages.push(buildPageHTML(chunk, false));
+    if (addBackground) pages.push(buildPageHTML(chunk, true));
+  }
 
   const html = `
   <html>
@@ -457,22 +445,6 @@ function openPrintView() {
           height: ${CONFIG.CARD_MM.H}mm;
           object-fit: cover;
           display: block;
-        }
-        .page-label{
-          position:absolute;
-          top: 4mm;
-          left: 50%;
-          transform: translateX(-50%);
-          z-index: 15;
-          padding: 2mm 4mm;
-          border: 0.2mm solid rgba(0,0,0,.25);
-          border-radius: 1.4mm;
-          background: #ffffff;
-          color: #0f3d2e;
-          font-weight: 800;
-          font-size: 3.2mm;
-          letter-spacing: .2mm;
-          box-shadow: 0 0.9mm 2.4mm rgba(0,0,0,.12);
         }
       </style>
     </head>
