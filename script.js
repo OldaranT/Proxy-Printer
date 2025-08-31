@@ -40,8 +40,18 @@ let cachedDeckName = "Deck";
 
 // Slider-style checkboxes (CSS-only): cutLinesToggle, spaceBetweenToggle, backSideToggle, blackBackgroundToggle, pageSizeToggle
 document.addEventListener('DOMContentLoaded', () => {
-  // Inject the totals bar just below the toggles (created dynamically so you don't need to touch index.html)
   ensureTotalsBar();
+  // Fallback for browsers without :has()
+  const supportsHas = CSS.supports?.('selector(:has(*))');
+  if (!supportsHas) {
+    document.querySelectorAll('.toggle').forEach(toggle => {
+      const input = toggle.querySelector('input[type="checkbox"]');
+      if (!input) return;
+      const sync = () => toggle.classList.toggle('is-on', input.checked);
+      input.addEventListener('change', sync);
+      sync();
+    });
+  }
 });
 
 // =============== Totals Bar (UI) ===============
