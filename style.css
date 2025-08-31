@@ -63,7 +63,6 @@ body::before{
 .container{max-width:980px;margin:36px auto 40px;padding:0 16px; overflow: visible;}
 .brand{margin-bottom:16px}
 
-/* compact row with logo + text */
 .brand-row{
   display:flex;
   align-items:center;
@@ -290,14 +289,25 @@ body::before{
   position: relative;
   aspect-ratio:63/88;
   background:#f4f7f5;
-  border:1px solid #e7eee9;
+  border:1px solid #dfe7e3;
   border-radius:var(--radius-ssm);
   overflow:hidden;
   box-shadow: 0 2px 8px rgba(0,0,0,.06);
   z-index: 0;
   cursor: zoom-in;
+
+  /* smooth fade when toggling 0/active state */
+  transition: opacity .18s ease, filter .18s ease, box-shadow .18s ease;
 }
 
+/* Zero-quantity = dimmed (still clickable) */
+.card-grid .card.is-zero{
+  opacity: .45;
+  filter: grayscale(.15) saturate(.85);
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+
+/* Image fills tile below overlays */
 .card-grid .card img{
   position:absolute;
   inset:0;
@@ -339,6 +349,9 @@ body::before{
   pointer-events:none;
 }
 
+/* Force showing ×1 if you had an old rule hiding it */
+.card[aria-label*="quantity 1"] .qty-badge { display: inline-flex !important; }
+
 /* ================= Preview Modal (click-to-zoom) ================= */
 body.modal-open{ overflow: hidden; }
 
@@ -358,7 +371,7 @@ body.modal-open{ overflow: hidden; }
 
 .preview-card{
   position: relative;
-  width: min(45vw, 390px);
+  width: min(45vw, 390px);   /* half the older size; tweak as you like */
   aspect-ratio: 63 / 88;
   border-radius: var(--radius-sm);
   box-shadow:
@@ -458,5 +471,5 @@ body.modal-open{ overflow: hidden; }
 
 /* Responsive modal sizing */
 @media (max-width: 520px){
-  .preview-card{ width: min(70vw, 340px); }  /* adjust if you want smaller/larger */
+  .preview-card{ width: min(70vw, 340px); }
 }

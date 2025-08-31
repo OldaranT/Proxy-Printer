@@ -27,7 +27,7 @@ const CONFIG = {
     COLOR: '#00ff00'               // crop mark color
   },
 
-  // Back image for duplex printing
+  // Back image for duplex printing (UPDATED)
   BACK_IMAGE_URL: 'https://cdn.imgchest.com/files/7kzcajvdwp7.png',
 
   // Canvas pixel density (used to size the canvases to the physical page)
@@ -48,18 +48,26 @@ function clampQty(n) {
   n = Number.isFinite(+n) ? +n : 0;
   return Math.max(0, Math.floor(n));
 }
+
+function applyZeroStateClass(tile, qty) {
+  tile?.classList.toggle('is-zero', qty === 0);
+}
+
 function setCardQuantity(index, qty) {
   if (!cachedImages[index]) return;
   const newQty = clampQty(qty);
   cachedImages[index].quantity = newQty;
 
-  // Update tile badge + a11y label live
+  // Update tile badge + a11y label + 0-state class live
   const tile = document.querySelector(`.card[data-index="${index}"]`);
   if (tile) {
     const badge = tile.querySelector('.qty-badge');
     if (badge) badge.textContent = `×${newQty}`;
+
     const name = cachedImages[index].name ?? 'Card';
     tile.setAttribute('aria-label', `${name} – quantity ${newQty}`);
+
+    applyZeroStateClass(tile, newQty);
   }
 }
 
@@ -127,6 +135,9 @@ async function loadDeck() {
       const badge = document.createElement('span');
       badge.className = 'qty-badge';
       badge.textContent = `×${qty}`;
+
+      // mark zero-state visually
+      applyZeroStateClass(div, qty);
 
       // click to open preview modal
       div.addEventListener('click', () => openPreviewModal(i));
