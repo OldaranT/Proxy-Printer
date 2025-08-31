@@ -20,24 +20,24 @@ const CONFIG = {
     COLOR: '#00ff00'
   },
 
-  // Updated back image source
+  // UPDATED back image source
   BACK_IMAGE_URL: 'https://cdn.imgchest.com/files/7kzcajvdwp7.png',
 
   CANVAS_DPI: 96,
 
-  // Category label on print fronts
+  // Show category labels on print pages (fronts only)
   PRINT_CATEGORY_LABELS: true
 };
 // ----------------------------------------
 
 let cachedImages = [];
 let cachedDeckName = "Deck";
-let categoryOrderFromServer = []; // optional hint from server
+let categoryOrderFromServer = []; // optional order hint from server
 
 document.addEventListener('DOMContentLoaded', () => {
   ensureTotalsBar();
 
-  // Fallback for :has() in CSS
+  // Fallback for :has() styles in CSS (older browsers)
   const supportsHas = CSS.supports?.('selector(:has(*))');
   if (!supportsHas) {
     document.querySelectorAll('.toggle').forEach(toggle => {
@@ -114,7 +114,7 @@ function setCardQuantity(index, qty) {
     applyZeroStateClass(tile, newQty);
   }
   updateTotalsBar();
-  updateCategoryCounts(); // NEW: keep per-category counts in sync
+  updateCategoryCounts();
 }
 
 function extractDeckUrl(url) {
@@ -153,21 +153,18 @@ function groupByCategory(cards) {
   return order.map(cat => [cat, groups.get(cat)]);
 }
 
-// Compute counts for a group
 function countsForCategory(cards) {
   const uniqueCount = cards.length;
   const copyCount = cards.reduce((sum, c) => sum + clampQty(c.quantity ?? 0), 0);
   return { uniqueCount, copyCount };
 }
 
-// Render overview: vertical stacking — label then cards, repeat
+// Render overview: vertical (label → cards → next label → cards)
 function renderOverviewGrid() {
   const grid = document.getElementById('cardGrid');
 
-  // Force the container to be a simple block (not a grid),
-  // even if the HTML still has class="card-grid" from older markup.
+  // Force simple stacked layout even if old class remains
   grid.className = 'categories-wrap';
-
   grid.innerHTML = '';
 
   const grouped = groupByCategory(cachedImages);
@@ -194,7 +191,7 @@ function renderOverviewGrid() {
     wrap.className = 'category-grid';
 
     cards.forEach(card => {
-      const i = card._idx; // original index
+      const i = card._idx;
       const tile = document.createElement('div');
       tile.className = 'card';
       tile.dataset.index = String(i);
@@ -237,18 +234,18 @@ function updateCategoryCounts() {
   });
 }
 
-// Simple HTML escaper
+// HTML/CSS escapers
 function escapeHTML(s) {
   return String(s).replace(/[&<>"']/g, c => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   })[c]);
 }
-// CSS.escape fallback
 function cssEscape(s) {
   if (window.CSS && CSS.escape) return CSS.escape(s);
   return String(s).replace(/["\\#.:?[\]()]/g, '\\$&');
 }
 
+// =============== Load deck ===============
 async function loadDeck() {
   const urlInput = document.getElementById('deckUrl');
   const button = document.getElementById('loadBtn');
@@ -287,8 +284,10 @@ async function loadDeck() {
       throw new Error("No images returned.");
     }
 
+    // Optional order hint from server
     categoryOrderFromServer = Array.isArray(data.categoryOrder) ? data.categoryOrder : [];
 
+    // IMPORTANT CHANGE: keep category and clamp quantities (also safe for DFCs backed by server changes)
     cachedImages = data.images.map((card, i) => ({
       ...card,
       quantity: clampQty(card.quantity ?? 1),
@@ -330,7 +329,7 @@ function choosePageGeometry(sizeKey, gapmm) {
   return (b.cols * b.rows) > (a.cols * a.rows) ? landscape : portrait;
 }
 
-// Build all print pages, grouped by category, excluding ×0
+// Build all print pages, grouped by category, skipping ×0
 function openPrintView() {
   if (!cachedImages.length) return;
 
