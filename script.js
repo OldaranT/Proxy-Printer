@@ -42,9 +42,7 @@ let cachedDeckName = "Deck";
 // cutLinesToggle, spaceBetweenToggle, backSideToggle, blackBackgroundToggle, pageSizeToggle
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Nothing special needed for slider toggles:
-  // styling is handled purely by CSS via :checked.
-  // This hook is kept in case you want to attach listeners later.
+  // Slider toggles are pure CSS (:checked). No JS needed here.
 });
 
 function extractDeckUrl(url) {
@@ -141,7 +139,7 @@ function choosePageGeometry(sizeKey, gapmm) {
  * - spaceBetweenToggle: adds GAP_WHEN_ENABLED_MM gaps between cards (cards remain 63x88mm).
  * - backSideToggle: inserts a matching "backs" page after each fronts page.
  *   Backs are ALWAYS full-page grids (9 for A4, 18 for A3) and perfectly centered.
- * - blackBackgroundToggle: fills the entire page background using a CANVAS at the lowest z-index.
+ * - blackBackgroundToggle: draws a CANVAS at the lowest z-index (−5) so PDF includes it.
  * - cutLinesToggle: per-card corner crop marks (2mm lines, start 0.5mm from edges).
  * - pageSizeToggle: toggles between A4 (unchecked) and A3 (checked).
  * - Auto orientation: chooses portrait/landscape to fit the MOST cards per page.
@@ -149,8 +147,8 @@ function choosePageGeometry(sizeKey, gapmm) {
 function openPrintView() {
   if (!cachedImages.length) return;
 
-  const deckName = cachedDeckName;
-  const showCutlines   = document.getElementById('cutLinesToggle')?.checked;
+  const deckName        = cachedDeckName;
+  const showCutlines    = document.getElementById('cutLinesToggle')?.checked;
   const addSpaceBetween = document.getElementById('spaceBetweenToggle')?.checked;
   const addBackground   = document.getElementById('backSideToggle')?.checked;
   const useA3           = document.getElementById('pageSizeToggle')?.checked || false;
@@ -207,9 +205,9 @@ function openPrintView() {
 
     return `
       <div class="page ${isBack ? 'back' : 'front'}">
-        <!-- Lowest layer: a CANVAS we fill (black/transparent) to ensure PDF includes it -->
+        <!-- Lowest layer: CANVAS we fill (black/transparent), with z-index -5 inside a page stacking context -->
         <canvas class="page-fill" width="${CANVAS_W_PX}" height="${CANVAS_H_PX}"
-                style="position:absolute; left:0; top:0; width:${PAGE_W}mm; height:${PAGE_H}mm; z-index:0;"></canvas>
+          style="position:absolute; left:0; top:0; width:${PAGE_W}mm; height:${PAGE_H}mm; z-index:-5;"></canvas>
 
         <!-- Centered sheet of cards -->
         <div class="sheet" style="
@@ -221,14 +219,14 @@ function openPrintView() {
           grid-template-columns: repeat(${GRID_COLS}, ${CARD_W}mm);
           grid-template-rows: repeat(${GRID_ROWS}, ${CARD_H}mm);
           gap:${GAP}mm;
-          z-index:2;">
+          z-index:10;">
           ${imagesHTML}
         </div>
 
         <!-- Cutlines overlay -->
-        <div class="cutlines" style="position:absolute; inset:0; z-index:3; pointer-events:none; display:${showCutlines ? 'block' : 'none'};">
+        <div class="cutlines" style="position:absolute; inset:0; z-index:20; pointer-events:none; display:${showCutlines ? 'block' : 'none'};">
           <canvas width="${CANVAS_W_PX}" height="${CANVAS_H_PX}"
-                  style="position:absolute; left:0; top:0; width:${PAGE_W}mm; height:${PAGE_H}mm;"></canvas>
+            style="position:absolute; left:0; top:0; width:${PAGE_W}mm; height:${PAGE_H}mm;"></canvas>
         </div>
       </div>
     `;
@@ -255,6 +253,11 @@ function openPrintView() {
           height: ${PAGE_H}mm;
           page-break-after: always;
           overflow: hidden;
+
+          /* Ensure a stacking context so negative z-index children stay behind
+             only within this page and don't slip under other pages */
+          z-index: 0;
+          isolation: isolate;
         }
         .sheet img {
           width: ${CARD_W}mm;
@@ -269,7 +272,7 @@ function openPrintView() {
       <script>
         document.title = ${JSON.stringify(title)};
 
-        // Injected constants
+        // Injected geometry (shared by fronts/backs/cutlines)
         const USE_BLACK_BG = ${useBlackBg ? 'true' : 'false'};
         const OFFSET_MM = ${CONFIG.CUTLINE.OFFSET_FROM_EDGE_MM};
         const LENGTH_MM = ${CONFIG.CUTLINE.LENGTH_MM};
@@ -283,6 +286,8 @@ function openPrintView() {
         const GAP = ${GAP};
         const GRID_COLS = ${GRID_COLS};
         const GRID_ROWS = ${GRID_ROWS};
+        const MARGIN_L = ${MARGIN_L};
+        const MARGIN_T = ${MARGIN_T};
 
         // Fill the bottom page canvas (ensures background is part of PDF content)
         document.querySelectorAll('.page-fill').forEach(canvas => {
@@ -291,7 +296,7 @@ function openPrintView() {
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
           } else {
-            // keep transparent; or uncomment to force white
+            // transparent; uncomment to force white
             // ctx.fillStyle = '#FFFFFF';
             // ctx.fillRect(0, 0, canvas.width, canvas.height);
           }
@@ -339,20 +344,14 @@ function openPrintView() {
           ctx.stroke();
         }
 
-        // Draw cutlines for each page (uses the sheet's inline top/left in mm for exact alignment)
+        // Draw cutlines for each page using the same center-based math (no DOM reads)
         document.querySelectorAll('.cutlines canvas').forEach(canvas => {
           const ctx = canvas.getContext('2d');
           const pxPerMM_X = canvas.width / PAGE_W;
           const pxPerMM_Y = canvas.height / PAGE_H;
 
-          const sheet = canvas.parentElement.previousElementSibling; // .sheet
-          const style = sheet.style;
-
-          const leftMM = parseFloat(style.left);
-          const topMM  = parseFloat(style.top);
-
-          const left = leftMM * pxPerMM_X;
-          const top  = topMM  * pxPerMM_Y;
+          const left = MARGIN_L * pxPerMM_X;
+          const top  = MARGIN_T * pxPerMM_Y;
 
           const cardW = CARD_W * pxPerMM_X;
           const cardH = CARD_H * pxPerMM_Y;
