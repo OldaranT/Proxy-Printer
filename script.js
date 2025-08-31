@@ -20,7 +20,7 @@ const CONFIG = {
     COLOR: '#00ff00'
   },
 
-  // UPDATED back image source
+  // Back image source
   BACK_IMAGE_URL: 'https://cdn.imgchest.com/files/7kzcajvdwp7.png',
 
   CANVAS_DPI: 96
@@ -112,6 +112,13 @@ function setCardQuantity(index, qty) {
   }
   updateTotalsBar();
   updateCategoryCounts();
+
+  // keep modal display in sync if open
+  const modalQty = document.querySelector('.preview-controls .qty-display');
+  const controls = document.querySelector('.preview-controls');
+  if (controls && Number(controls?.dataset.index) === index && modalQty) {
+    modalQty.textContent = `×${newQty}`;
+  }
 }
 
 function extractDeckUrl(url) {
@@ -160,7 +167,6 @@ function countsForCategory(cards) {
 function renderOverviewGrid() {
   const grid = document.getElementById('cardGrid');
 
-  // Force simple stacked layout even if old class remains
   grid.className = 'categories-wrap';
   grid.innerHTML = '';
 
@@ -281,10 +287,9 @@ async function loadDeck() {
       throw new Error("No images returned.");
     }
 
-    // Optional order hint from server
     categoryOrderFromServer = Array.isArray(data.categoryOrder) ? data.categoryOrder : [];
 
-    // Keep category for overview; quantities clamped
+    // keep category & clamp quantities
     cachedImages = data.images.map((card, i) => ({
       ...card,
       quantity: clampQty(card.quantity ?? 1),
@@ -359,7 +364,7 @@ function openPrintView() {
   const CANVAS_W_PX = Math.round((PAGE_W / MM_PER_IN) * CONFIG.CANVAS_DPI);
   const CANVAS_H_PX = Math.round((PAGE_H / MM_PER_IN) * CONFIG.CANVAS_DPI);
 
-  // 🔑 Flatten all cards with qty > 0, in their current deck order
+  // Flatten all cards with qty > 0, in their current deck order
   const imgsAll = [];
   cachedImages.forEach(card => {
     const q = clampQty(card.quantity);
@@ -582,9 +587,13 @@ function openPreviewModal(index) {
         <img src="${card.img}" alt="${card.name ?? 'Card'}">
       </div>
       <div class="preview-controls" data-index="${index}">
-        <button class="qty-btn minus" aria-label="Decrease quantity">−</button>
+        <button class="qty-btn step minus10" aria-label="Decrease by 10">−10</button>
+        <button class="qty-btn step minus5"  aria-label="Decrease by 5">−5</button>
+        <button class="qty-btn minus"        aria-label="Decrease by 1">−1</button>
         <span class="qty-display" aria-live="polite">×${clampQty(card.quantity)}</span>
-        <button class="qty-btn plus" aria-label="Increase quantity">+</button>
+        <button class="qty-btn plus"         aria-label="Increase by 1">+1</button>
+        <button class="qty-btn step plus5"   aria-label="Increase by 5">+5</button>
+        <button class="qty-btn step plus10"  aria-label="Increase by 10">+10</button>
       </div>
     </div>
   `;
@@ -598,11 +607,16 @@ function openPreviewModal(index) {
     if (!btn) return;
     const idx = Number(controls.dataset.index);
     const current = clampQty(cachedImages[idx]?.quantity ?? 0);
-    let next = current;
-    if (btn.classList.contains('minus')) next = Math.max(0, current - 1);
-    if (btn.classList.contains('plus')) next = current + 1;
+    let delta = 0;
+    if (btn.classList.contains('minus10')) delta = -10;
+    else if (btn.classList.contains('minus5')) delta = -5;
+    else if (btn.classList.contains('minus')) delta = -1;
+    else if (btn.classList.contains('plus')) delta = +1;
+    else if (btn.classList.contains('plus5')) delta = +5;
+    else if (btn.classList.contains('plus10')) delta = +10;
+
+    const next = Math.max(0, current + delta);
     setCardQuantity(idx, next);
-    controls.querySelector('.qty-display').textContent = `×${next}`;
   });
 
   const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); closePreviewModal(); } };
