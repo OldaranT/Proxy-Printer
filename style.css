@@ -34,12 +34,23 @@
 }
 
 /* ================= Page Background ================= */
+/* remove the background from body itself */
 body{
   margin:0;
   font-family: system-ui,-apple-system,Segoe UI,Roboto,Inter,Ubuntu,'Helvetica Neue',Arial,sans-serif;
   color:var(--ink);
+  background: transparent;
+}
 
-  /* no fixed pixel sizes; use farthest-corner so it fills any viewport */
+/* infinite background: a fixed, behind-everything layer */
+body::before{
+  content:"";
+  position: fixed;
+  inset: 0;                 /* cover the viewport */
+  z-index: -1;              /* sit behind all content */
+  pointer-events: none;
+
+  /* gradients that never “run out” */
   background:
     radial-gradient(ellipse farthest-corner at 85% -10%,
       rgba(33,160,106,.14) 0%, rgba(33,160,106,0) 60%),
@@ -47,12 +58,11 @@ body{
       rgba(15,61,46,.12) 0%, rgba(15,61,46,0) 55%),
     linear-gradient(180deg,#f9fcfa 0%,#f0f7f3 60%,#eef6f1 100%);
 
-  /* prevent any tiling across huge canvases */
   background-repeat: no-repeat, no-repeat, no-repeat;
-
-  /* stretch each layer to the full page box */
-  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-size: cover, cover, cover;   /* fill viewport at all sizes */
+  background-attachment: fixed, fixed, fixed; /* belt & suspenders */
 }
+
 
 /* ================= Container & Brand ================= */
 .container{max-width:980px;margin:36px auto 40px;padding:0 16px;}
