@@ -40,8 +40,50 @@ let cachedDeckName = "Deck";
 
 // Slider-style checkboxes (CSS-only): cutLinesToggle, spaceBetweenToggle, backSideToggle, blackBackgroundToggle, pageSizeToggle
 document.addEventListener('DOMContentLoaded', () => {
-  // No JS needed for slider styling; hook available if you want listeners later.
+  // Inject the totals bar just below the toggles (created dynamically so you don't need to touch index.html)
+  ensureTotalsBar();
 });
+
+// =============== Totals Bar (UI) ===============
+function ensureTotalsBar() {
+  if (document.getElementById('totalsBar')) return;
+
+  const toggles = document.querySelector('.toggles');
+  const bar = document.createElement('div');
+  bar.id = 'totalsBar';
+  bar.className = 'totals-bar';
+  bar.innerHTML = `
+    <span class="label">Total cards to print:</span>
+    <span class="value" id="totalCount">0</span>
+    <span class="muted">(<span id="zeroCount">0</span> at ×0)</span>
+  `;
+  if (toggles && toggles.parentElement) {
+    toggles.insertAdjacentElement('afterend', bar);
+  } else {
+    document.querySelector('.container')?.prepend(bar);
+  }
+  updateTotalsBar();
+}
+
+function getTotals() {
+  const unique = cachedImages.length;
+  let total = 0;
+  let zeroed = 0;
+  for (const c of cachedImages) {
+    const q = clampQty(c.quantity ?? 0);
+    if (q === 0) zeroed++;
+    total += q;
+  }
+  return { unique, total, zeroed };
+}
+
+function updateTotalsBar() {
+  const { total, zeroed } = getTotals();
+  const totalEl = document.getElementById('totalCount');
+  const zeroEl = document.getElementById('zeroCount');
+  if (totalEl) totalEl.textContent = String(total);
+  if (zeroEl) zeroEl.textContent = String(zeroed);
+}
 
 // =============== Helpers for quantity ===============
 function clampQty(n) {
@@ -69,6 +111,9 @@ function setCardQuantity(index, qty) {
 
     applyZeroStateClass(tile, newQty);
   }
+
+  // Refresh totals
+  updateTotalsBar();
 }
 
 function extractDeckUrl(url) {
@@ -103,6 +148,7 @@ async function loadDeck() {
   loading.classList.remove('hidden');
   grid.innerHTML = '';
   cachedImages = [];
+  updateTotalsBar(); // reset totals display
 
   try {
     const res = await fetch(`https://mtg-proxy-api-server.onrender.com/api/deck?url=${encodeURIComponent(deckUrl)}`);
@@ -156,6 +202,9 @@ async function loadDeck() {
   loading.classList.add('hidden');
   urlInput.disabled = false;
   button.disabled = false;
+
+  // Update totals after rendering
+  updateTotalsBar();
 }
 
 /**
