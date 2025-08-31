@@ -38,11 +38,9 @@ const CONFIG = {
 let cachedImages = [];
 let cachedDeckName = "Deck";
 
-// The new UI uses slider-style checkboxes with these IDs:
-// cutLinesToggle, spaceBetweenToggle, backSideToggle, blackBackgroundToggle, pageSizeToggle
-
+// Slider-style checkboxes (CSS-only): cutLinesToggle, spaceBetweenToggle, backSideToggle, blackBackgroundToggle, pageSizeToggle
 document.addEventListener('DOMContentLoaded', () => {
-  // Slider toggles are pure CSS (:checked). No JS needed here.
+  // No JS needed for slider styling; hook available if you want listeners later.
 });
 
 function extractDeckUrl(url) {
@@ -211,6 +209,7 @@ function openPrintView() {
 
         <!-- Centered sheet of cards -->
         <div class="sheet" style="
+          position:absolute;              /* CRITICAL: allow top/left to place grid */
           top:${MARGIN_T}mm;
           left:${MARGIN_L}mm;
           width:${SHEET_W}mm;
@@ -259,6 +258,7 @@ function openPrintView() {
           z-index: 0;
           isolation: isolate;
         }
+        .sheet { position: absolute; }  /* ensure top/left work if inline style is stripped */
         .sheet img {
           width: ${CARD_W}mm;
           height: ${CARD_H}mm;
