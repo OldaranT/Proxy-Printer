@@ -48,9 +48,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const showBackgroundToggleWrapper = document.getElementById('showBackgroundToggleWrapper');
   const showBackgroundToggleCheckbox = document.getElementById('showBackgroundToggle');
 
-  // NEW: Page size toggle (A4 <-> A3). When checked => A3, unchecked => A4
   const pageSizeToggleWrapper = document.getElementById('pageSizeToggleWrapper');
   const pageSizeToggleCheckbox = document.getElementById('pageSizeToggle');
+
+  const blackBackgroundToggleWrapper = document.getElementById('blackBackgroundToggleWrapper');
+  const blackBackgroundToggleCheckbox = document.getElementById('blackBackgroundToggle');
 
   // Wrapper click -> toggle checkbox + active class
   if (cutlineToggleWrapper && cutlineToggleCheckbox) {
@@ -81,6 +83,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  if (blackBackgroundToggleWrapper && blackBackgroundToggleCheckbox) {
+    blackBackgroundToggleWrapper.addEventListener('click', () => {
+      blackBackgroundToggleCheckbox.checked = !blackBackgroundToggleCheckbox.checked;
+      blackBackgroundToggleWrapper.classList.toggle('active', blackBackgroundToggleCheckbox.checked);
+    });
+  }
+
   // Ensure initial state is synced
   if (cutlineToggleWrapper && cutlineToggleCheckbox) {
     cutlineToggleWrapper.classList.toggle('active', cutlineToggleCheckbox.checked);
@@ -93,6 +102,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   if (pageSizeToggleWrapper && pageSizeToggleCheckbox) {
     pageSizeToggleWrapper.classList.toggle('active', pageSizeToggleCheckbox.checked);
+  }
+  if (blackBackgroundToggleWrapper && blackBackgroundToggleCheckbox) {
+    blackBackgroundToggleWrapper.classList.toggle('active', blackBackgroundToggleCheckbox.checked);
   }
 });
 
@@ -170,34 +182,30 @@ function computeGridDims(pageWmm, pageHmm, cardWmm, cardHmm, gapmm) {
 }
 
 /**
- * Given a size key (A4/A3) and current gap, pick portrait or landscape
- * to maximize capacity (unless ORIENTATION_MODE forces one).
+ * Choose portrait or landscape to maximize capacity (unless orientation is forced).
  */
 function choosePageGeometry(sizeKey, gapmm) {
   const base = CONFIG.PAGE_SIZES_MM[sizeKey]; // portrait dims
   let portrait = { W: base.W, H: base.H, orient: 'portrait' };
   let landscape = { W: base.H, H: base.W, orient: 'landscape' };
 
-  // Respect forced orientation
   if (CONFIG.ORIENTATION_MODE === 'portrait') return portrait;
   if (CONFIG.ORIENTATION_MODE === 'landscape') return landscape;
 
-  // Auto: compute capacity both ways and pick the larger
   const a = computeGridDims(portrait.W, portrait.H, CONFIG.CARD_MM.W, CONFIG.CARD_MM.H, gapmm);
   const b = computeGridDims(landscape.W, landscape.H, CONFIG.CARD_MM.W, CONFIG.CARD_MM.H, gapmm);
-  const capA = a.cols * a.rows;
-  const capB = b.cols * b.rows;
-
-  return capB > capA ? landscape : portrait; // tie -> portrait
+  return (b.cols * b.rows) > (a.cols * a.rows) ? landscape : portrait; // tie -> portrait
 }
 
 /**
  * Print view with options:
  * - spaceBetweenToggle: adds GAP_WHEN_ENABLED_MM gaps between cards (cards remain 63x88mm).
- * - showBackgroundToggle: inserts a matching "backs" page after each fronts page (duplex aligned).
+ * - showBackgroundToggle: inserts a matching "backs" page after each fronts page.
+ *   Backs are ALWAYS full-page grids (9 for A4, 18 for A3) and perfectly centered.
+ * - blackBackgroundToggle: fills the entire page background in black (lowest z-index layer).
  * - cutlineToggle: per-card corner crop marks (2mm lines, start 0.5mm from edges).
  * - pageSizeToggle: toggles between A4 (unchecked) and A3 (checked).
- * - Auto orientation: chooses portrait/landscape to fit the MOST cards per page (=> A3 lands at 18).
+ * - Auto orientation: chooses portrait/landscape to fit the MOST cards per page.
  */
 function openPrintView() {
   if (!cachedImages.length) return;
@@ -206,11 +214,12 @@ function openPrintView() {
   const showCutlines = document.getElementById('cutlineToggle')?.checked;
   const addSpaceBetween = document.getElementById('spaceBetweenToggle')?.checked;
   const addBackground = document.getElementById('showBackgroundToggle')?.checked;
-
-  // Page size toggle: unchecked => A4, checked => A3
   const useA3 = document.getElementById('pageSizeToggle')?.checked || false;
+  const useBlackBg = document.getElementById('blackBackgroundToggle')?.checked || false;
+
   const sizeKey = useA3 ? 'A3' : CONFIG.DEFAULT_PAGE;
 
+  // Geometry (mm)
   const CARD_W = CONFIG.CARD_MM.W;
   const CARD_H = CONFIG.CARD_MM.H;
   const GAP = addSpaceBetween ? CONFIG.GAP_WHEN_ENABLED_MM : 0;
@@ -224,7 +233,7 @@ function openPrintView() {
   // Compute grid (dynamic)
   const { cols: GRID_COLS, rows: GRID_ROWS } = computeGridDims(PAGE_W, PAGE_H, CARD_W, CARD_H, GAP);
 
-  // Derived sheet dimensions and centered margins
+  // Derived sheet dimensions and centered margins (CENTER-BASED ALIGNMENT)
   const SHEET_W = GRID_COLS * CARD_W + (GRID_COLS - 1) * GAP;
   const SHEET_H = GRID_ROWS * CARD_H + (GRID_ROWS - 1) * GAP;
   const MARGIN_L = Math.max(0, (PAGE_W - SHEET_W) / 2);
@@ -244,18 +253,28 @@ function openPrintView() {
     `${perPage}/page`,
     showCutlines ? '(cutlines)' : '(no cutlines)',
     addSpaceBetween ? `(${GAP}mm gaps)` : '(tight)',
-    addBackground ? '(with backs)' : ''
+    addBackground ? '(with backs)' : '',
+    useBlackBg ? '(black page bg)' : ''
   ].filter(Boolean);
   const title = titleBits.join(' ');
 
   const win = window.open('', '_blank');
 
   function buildPageHTML(imgSrcs, isBack = false) {
-    const imgs = isBack ? new Array(imgSrcs.length).fill(CONFIG.BACK_IMAGE_URL) : imgSrcs;
+    // FRONT: use actual chunk images (could be < perPage)
+    // BACK: always fill the entire page with background backs (exactly perPage)
+    const imgs = isBack
+      ? new Array(perPage).fill(CONFIG.BACK_IMAGE_URL)
+      : imgSrcs;
+
     const imagesHTML = imgs.map(src => `<img src="${src}" alt="${isBack ? 'Card back' : 'Card front'}" />`).join('');
+
+    // lowest layer page background div (black or white)
+    const pageBgStyle = useBlackBg ? 'background:#000;' : 'background:#fff;';
 
     return `
       <div class="page ${isBack ? 'back' : 'front'}">
+        <div class="page-bg" style="${pageBgStyle}"></div>
         <div class="sheet" style="
           top:${MARGIN_T}mm;
           left:${MARGIN_L}mm;
@@ -277,8 +296,8 @@ function openPrintView() {
   const pages = [];
   for (let i = 0; i < cards.length; i += perPage) {
     const chunk = cards.slice(i, i + perPage);
-    pages.push(buildPageHTML(chunk, false));        // Fronts
-    if (addBackground) pages.push(buildPageHTML(chunk, true)); // Backs
+    pages.push(buildPageHTML(chunk, false));        // Fronts (may be partial on last page)
+    if (addBackground) pages.push(buildPageHTML(chunk, true)); // Backs (ALWAYS full grid)
   }
 
   const html = `
@@ -287,23 +306,30 @@ function openPrintView() {
       <title>Print Template</title>
       <style>
         @page { size: ${PAGE_W}mm ${PAGE_H}mm; margin: 0; }
-        html, body { margin: 0; padding: 0; background: white; }
+        html, body { margin: 0; padding: 0; background: transparent; }
         .page {
           position: relative;
           width: ${PAGE_W}mm;
           height: ${PAGE_H}mm;
           page-break-after: always;
+          overflow: hidden;
         }
-        .cutlines {
+        /* lowest layer background (toggleable black/white) */
+        .page-bg {
           position: absolute;
           inset: 0;
-          z-index: 1;
-          pointer-events: none;
+          z-index: 0; /* backest layer */
         }
         .sheet {
           position: absolute;
           display: grid;
-          z-index: 2;
+          z-index: 2; /* above page-bg */
+        }
+        .cutlines {
+          position: absolute;
+          inset: 0;
+          z-index: 3; /* above everything for visibility */
+          pointer-events: none;
         }
         .sheet img {
           width: ${CARD_W}mm;
@@ -380,7 +406,7 @@ function openPrintView() {
           const pxPerMM_X = canvas.width / PAGE_W;
           const pxPerMM_Y = canvas.height / PAGE_H;
 
-          const sheet = canvas.parentElement.previousElementSibling;
+          const sheet = canvas.parentElement.previousElementSibling; // .sheet
           const style = sheet.style;
 
           const leftMM = parseFloat(style.left);
