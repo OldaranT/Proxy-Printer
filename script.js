@@ -20,12 +20,12 @@ const CONFIG = {
     COLOR: '#00ff00'
   },
 
-  // UPDATED back image source
+  // Updated back image source
   BACK_IMAGE_URL: 'https://cdn.imgchest.com/files/7kzcajvdwp7.png',
 
   CANVAS_DPI: 96,
 
-  // Category label printing on front pages
+  // Category label on print fronts
   PRINT_CATEGORY_LABELS: true
 };
 // ----------------------------------------
@@ -114,6 +114,7 @@ function setCardQuantity(index, qty) {
     applyZeroStateClass(tile, newQty);
   }
   updateTotalsBar();
+  updateCategoryCounts(); // NEW: keep per-category counts in sync
 }
 
 function extractDeckUrl(url) {
@@ -134,7 +135,6 @@ function groupByCategory(cards) {
     groups.get(cat).push(c);
   });
 
-  // If server sent categoryOrder, respect that order but keep unknowns at the end
   if (Array.isArray(categoryOrderFromServer) && categoryOrderFromServer.length) {
     const ordered = [];
     const seen = new Set();
@@ -144,31 +144,50 @@ function groupByCategory(cards) {
         seen.add(cat);
       }
     });
-    // append any categories not in the given order
     order.forEach(cat => {
       if (!seen.has(cat)) ordered.push([cat, groups.get(cat)]);
     });
     return ordered;
   }
 
-  // Default: order of first appearance
   return order.map(cat => [cat, groups.get(cat)]);
 }
 
-// Render overview: grouped sections with headings
+// Compute counts for a group
+function countsForCategory(cards) {
+  const uniqueCount = cards.length;
+  const copyCount = cards.reduce((sum, c) => sum + clampQty(c.quantity ?? 0), 0);
+  return { uniqueCount, copyCount };
+}
+
+// Render overview: vertical stacking — label then cards, repeat
 function renderOverviewGrid() {
   const grid = document.getElementById('cardGrid');
+
+  // Force the container to be a simple block (not a grid),
+  // even if the HTML still has class="card-grid" from older markup.
+  grid.className = 'categories-wrap';
+
   grid.innerHTML = '';
 
   const grouped = groupByCategory(cachedImages);
 
   grouped.forEach(([category, cards]) => {
+    const { uniqueCount, copyCount } = countsForCategory(cards);
+
     const section = document.createElement('section');
     section.className = 'category-section';
+    section.dataset.category = category;
 
-    const header = document.createElement('h2');
+    const header = document.createElement('div');
     header.className = 'category-title';
-    header.textContent = category;
+    header.innerHTML = `
+      <span class="category-name">${escapeHTML(category)}</span>
+      <span class="category-meta">
+        <span class="category-uniques" title="Unique cards">${uniqueCount} unique</span>
+        <span class="category-count" title="Total copies to print">${copyCount}</span>
+      </span>
+    `;
     section.appendChild(header);
 
     const wrap = document.createElement('div');
@@ -202,6 +221,32 @@ function renderOverviewGrid() {
     section.appendChild(wrap);
     grid.appendChild(section);
   });
+}
+
+function updateCategoryCounts() {
+  const grouped = groupByCategory(cachedImages);
+  grouped.forEach(([category, cards]) => {
+    const { uniqueCount, copyCount } = countsForCategory(cards);
+    const sel = `.category-section[data-category="${cssEscape(category)}"]`;
+    const section = document.querySelector(sel);
+    if (!section) return;
+    const uniquesEl = section.querySelector('.category-uniques');
+    const countEl = section.querySelector('.category-count');
+    if (uniquesEl) uniquesEl.textContent = `${uniqueCount} unique`;
+    if (countEl) countEl.textContent = `${copyCount}`;
+  });
+}
+
+// Simple HTML escaper
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[c]);
+}
+// CSS.escape fallback
+function cssEscape(s) {
+  if (window.CSS && CSS.escape) return CSS.escape(s);
+  return String(s).replace(/["\\#.:?[\]()]/g, '\\$&');
 }
 
 async function loadDeck() {
@@ -285,8 +330,7 @@ function choosePageGeometry(sizeKey, gapmm) {
   return (b.cols * b.rows) > (a.cols * a.rows) ? landscape : portrait;
 }
 
-// Build all print pages, grouped by category.
-// For each category we fill pages with that category's cards (respecting quantities, excluding ×0).
+// Build all print pages, grouped by category, excluding ×0
 function openPrintView() {
   if (!cachedImages.length) return;
 
@@ -319,7 +363,6 @@ function openPrintView() {
   const CANVAS_W_PX = Math.round((PAGE_W / MM_PER_IN) * CONFIG.CANVAS_DPI);
   const CANVAS_H_PX = Math.round((PAGE_H / MM_PER_IN) * CONFIG.CANVAS_DPI);
 
-  // Build list grouped by category (respect server order when available)
   const grouped = groupByCategory(cachedImages);
 
   const titleBits = [
@@ -375,19 +418,10 @@ function openPrintView() {
     `;
   }
 
-  // Escape basic HTML
-  function escapeHTML(s) {
-    return String(s).replace(/[&<>"']/g, c => ({
-      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-    })[c]);
-  }
-
-  // Build pages by category
   const perPage = GRID_COLS * GRID_ROWS;
   const pages = [];
 
   grouped.forEach(([category, cards]) => {
-    // Build flat array of image src respecting quantity (>0 only)
     const imgs = cards.flatMap(card => {
       const q = clampQty(card.quantity);
       return q > 0 ? new Array(q).fill(card.img) : [];
@@ -396,9 +430,7 @@ function openPrintView() {
 
     for (let i = 0; i < imgs.length; i += perPage) {
       const chunk = imgs.slice(i, i + perPage);
-      // front page for this chunk with label
       pages.push(buildPageHTML(chunk, { isBack: false, categoryName: category }));
-      // optional back page (no label)
       if (addBackground) pages.push(buildPageHTML(chunk, { isBack: true, categoryName: category }));
     }
   });
@@ -427,7 +459,6 @@ function openPrintView() {
           object-fit: cover;
           display: block;
         }
-        /* Small category label at the very top (doesn't affect grid math) */
         .page-label{
           position:absolute;
           top: 4mm;

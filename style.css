@@ -2,7 +2,6 @@
 
 /* ================= Theme Vars ================= */
 :root{
-  /* brand greens */
   --forest-900:#0a281c;
   --forest-800:#0d3123;
   --forest-700:#0f3d2e;
@@ -10,30 +9,25 @@
   --forest-500:#1a7a52;
   --forest-400:#21a06a;
 
-  /* neutrals */
   --ink:#0f1b14;
   --text:#ffffff;
   --text-dark:#0f1b14;
 
-  /* ui */
-  --mint-200:#cfeee0;       /* focus ring */
+  --mint-200:#cfeee0;
   --mint-100:#e9f6f0;
   --stone-200:#e7eee9;
   --stone-300:#c8d6cf;
 
-  /* radii (subtle) */
   --radius-ssm:3px;
   --radius-sm:8px;
   --radius-md:10px;
   --radius-lg:12px;
 
-  /* shadows */
   --shadow-strong:0 8px 24px rgba(0,0,0,.18);
   --shadow-soft:0 3px 10px rgba(0,0,0,.12);
   --glow-on:0 0 0 6px rgba(33,160,106,.22);
 
-  /* layout knobs */
-  --tile-min: 160px;        /* min width of card tiles in grids */
+  --tile-min: 160px;
 }
 
 /* ================= Background ================= */
@@ -45,10 +39,7 @@ body{
 }
 body::before{
   content:"";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background:
     radial-gradient(ellipse farthest-corner at 85% -10%, rgba(33,160,106,.14) 0%, rgba(33,160,106,0) 60%),
     radial-gradient(ellipse farthest-corner at -10% 110%, rgba(15,61,46,.12) 0%, rgba(15,61,46,0) 55%),
@@ -107,7 +98,6 @@ body::before{
 .toggle .state{ font-size:13.5px; font-weight:800; letter-spacing:.2px; color:#fff; user-select:none; transition: opacity .2s ease; }
 .toggle .state-on{opacity:.55}
 .toggle .state-off{opacity:1}
-/* :has() styles */
 .toggle:has(input:checked){
   background: linear-gradient(180deg, var(--forest-500), var(--forest-700));
   border-color: rgba(255,255,255,.1);
@@ -115,7 +105,7 @@ body::before{
 }
 .toggle:has(input:checked) .state-on{opacity:1}
 .toggle:has(input:checked) .state-off{opacity:.45}
-/* Fallback .is-on from JS */
+/* Fallback when :has() unsupported — toggled by JS */
 .toggle.is-on{
   background: linear-gradient(180deg, var(--forest-500), var(--forest-700));
   border-color: rgba(255,255,255,.1);
@@ -124,7 +114,7 @@ body::before{
 .toggle.is-on .state-on{ opacity: 1; }
 .toggle.is-on .state-off{ opacity: .45; }
 
-/* Switch — make input capture clicks */
+/* Switch */
 .switch{ position:relative; display:inline-block; width:66px; height:36px; flex:0 0 auto; }
 .switch input{ position:absolute; inset:0; margin:0; opacity:0; cursor:pointer; z-index: 2; }
 .switch .track{
@@ -184,34 +174,61 @@ body::before{
 .dots span:nth-child(3){ animation-delay: .30s; }
 @keyframes dotBlink{ 0%, 20%{ opacity: 0; transform: translateY(0); } 50%{ opacity: 1; transform: translateY(-1px); } 100%{ opacity: 0; transform: translateY(0); } }
 
-/* ================= Category sections ================= */
-.category-section{ margin: 18px 0 8px; }
+/* ================= Category layout (STACKED) ================= */
+
+/* If the container still has class="card-grid", force it to block so sections stack */
+#cardGrid.card-grid{ display:block !important; }
+
+/* New neutral wrapper applied by JS */
+.categories-wrap{ display:block; }
+
+/* Each category one after another */
+.category-section{ margin: 18px 0 18px; }
+
+/* Header: name on left, counts on right */
 .category-title{
-  margin: 0 0 8px; padding: 8px 12px;
+  display:flex; align-items:center; justify-content:space-between;
+  gap:10px;
+
+  margin: 0 0 10px; padding: 8px 12px;
   background: linear-gradient(180deg,#f6fbf8,#eef6f1);
   border: 1px solid #dfe7e3;
   border-radius: var(--radius-ssm);
   color: var(--forest-700);
-  font-size: 14px; font-weight: 900; letter-spacing: .3px;
   box-shadow: 0 1px 3px rgba(0,0,0,.06), inset 0 1px 0 rgba(255,255,255,.6);
-  /* Uncomment to make headers stick while scrolling
-  position: sticky; top: 0; z-index: 2; */
+}
+.category-name{
+  font-size: 14px; font-weight: 900; letter-spacing: .3px;
+}
+.category-meta{
+  display:flex; align-items:center; gap:8px;
+}
+.category-uniques{
+  font-size: 12.5px; color:#2c4b41; opacity: .85;
+}
+.category-count{
+  min-width: 28px;
+  display:inline-flex; align-items:center; justify-content:center;
+  padding: 2px 8px;
+  font-weight: 900; font-size: 12px; color: #fff; line-height: 1;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--forest-500), var(--forest-700));
+  border: 1px solid rgba(255,255,255,.18);
+  box-shadow: 0 4px 10px rgba(0,0,0,.12), inset 0 0 0 1px rgba(255,255,255,.08);
 }
 
-/* ================= Card grids (UNIFIED) ================= */
-.category-grid,
-.card-grid{
+/* Cards under each label */
+.category-grid{
   display:grid;
   grid-template-columns:repeat(auto-fill,minmax(var(--tile-min),1fr));
   gap:12px;
-  margin-top:14px;
   overflow: visible;
   position: relative;
   isolation: isolate;
 }
 
 /* ================= Card tiles ================= */
-.category-grid .card, .card-grid .card{
+.category-grid .card{
   position: relative;
   aspect-ratio:63/88;
   background:#f4f7f5; border:1px solid #dfe7e3; border-radius:var(--radius-ssm);
@@ -219,15 +236,15 @@ body::before{
   z-index: 0; cursor: zoom-in;
   transition: opacity .18s ease, filter .18s ease, box-shadow .18s ease;
 }
-.category-grid .card.is-zero, .card-grid .card.is-zero{
+.category-grid .card.is-zero{
   opacity: .45; filter: grayscale(.15) saturate(.85);
   box-shadow: 0 1px 4px rgba(0,0,0,.06);
 }
-.category-grid .card img, .card-grid .card img{
+.category-grid .card img{
   position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; z-index:1;
 }
 
-/* Quantity badge — bottom-right, always visible (×0 allowed) */
+/* Quantity badge */
 .qty-badge{
   position:absolute; z-index:2; right:6px; bottom:6px;
   display:inline-flex; align-items:center; justify-content:center;
@@ -238,7 +255,7 @@ body::before{
   box-shadow: 0 4px 10px rgba(0,0,0,.18), inset 0 0 0 1px rgba(255,255,255,.08);
   user-select:none; pointer-events:none;
 }
-/* Your preference: hide when quantity is 1 */
+/* hide when quantity is 1 (your preference) */
 .card[aria-label*="quantity 1"] .qty-badge { display: none; }
 
 /* ================= Modal (click preview) ================= */
