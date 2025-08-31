@@ -63,18 +63,18 @@ body::before{
   background-attachment: fixed, fixed, fixed; /* belt & suspenders */
 }
 
-
 /* ================= Container & Brand ================= */
 .container{max-width:980px;margin:36px auto 40px;padding:0 16px;}
 .brand{margin-bottom:16px}
 
-/* NEW: compact row with logo + text */
+/* compact row with logo + text */
 .brand-row{
   display:flex;
   align-items:center;
   gap:12px;
 }
 
+/* Logo: round PNG with a soft drop shadow (no background/border) */
 .brand-logo{
   width:56px;
   height:56px;
@@ -108,7 +108,7 @@ body::before{
   letter-spacing:.2px;
 }
 
-/* Responsive: make logo/title a bit smaller on phones */
+/* Responsive: make title a bit smaller on phones */
 @media (max-width: 520px){
   .brand-title{ font-size:28px }
 }
@@ -224,7 +224,13 @@ body::before{
 #loading{
   position:fixed; inset:0; backdrop-filter:saturate(120%) blur(1.5px);
   background: rgba(255,255,255,.6);
-  display:flex; align-items:center; justify-content:center; z-index:9999;
+  display:flex;
+  flex-direction: column;   /* stack spinner above text */
+  align-items:center;
+  justify-content:center;
+  z-index:9999;
+  text-align:center;
+  gap:12px;
 }
 .spinner-wrapper{ position:relative; width:92px; height:92px; }
 .spinner-ring{
@@ -238,33 +244,7 @@ body::before{
 }
 @keyframes spin{ to{ transform: rotate(360deg) } }
 
-/* ================= Card grid preview ================= */
-.card-grid{
-  display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
-  gap:12px; margin-top:14px;
-}
-.card-grid .card{
-  aspect-ratio:63/88;
-  background:#f4f7f5; border:1px solid #e7eee9; border-radius:var(--radius-ssm);
-  overflow:hidden; box-shadow: 0 2px 8px rgba(0,0,0,.06);
-}
-.card-grid .card img{ width:100%; height:100%; object-fit:cover; display:block; }
-
-/* ===== Loading overlay copy ===== */
-#loading{
-  position:fixed; inset:0; backdrop-filter:saturate(120%) blur(1.5px);
-  background: rgba(255,255,255,.6);
-  display:flex;
-  flex-direction: column;   /* ⬅️ stack spinner above text */
-  align-items:center;
-  justify-content:center;
-  z-index:9999;
-  text-align:center;        /* keeps text centered too */
-  gap: 12px;                /* optional: space between spinner & text */
-}
-
-#loading .spinner-wrapper{ margin-bottom: 0; } /* gap now handles spacing */
-
+/* Loading overlay copy */
 .spinner-copy{
   text-align:center;
   max-width: 520px;
@@ -272,7 +252,6 @@ body::before{
   padding: 0 12px;
   color: var(--forest-700);
 }
-
 .spinner-copy .quip{
   margin: 0 0 6px;
   font-weight: 800;
@@ -280,7 +259,6 @@ body::before{
   color: var(--forest-600);
   font-size: 16px;
 }
-
 .spinner-copy .hint{
   margin: 0;
   font-size: 13.5px;
@@ -288,11 +266,10 @@ body::before{
   color: #2d4a40;
   opacity: .9;
 }
-
 /* Animated dots after "Summoning proxies" */
 .dots{
   display:inline-block;
-  min-width: 1.6em;  /* keeps layout steady */
+  min-width: 1.6em;
   margin-left: .2em;
 }
 .dots span{
@@ -302,12 +279,50 @@ body::before{
   opacity: 0;
   animation: dotBlink 1.2s infinite ease-in-out;
 }
-.dots span:nth-child(1){ animation-delay: 0s;   }
+.dots span:nth-child(1){ animation-delay: 0s; }
 .dots span:nth-child(2){ animation-delay: .15s; }
 .dots span:nth-child(3){ animation-delay: .30s; }
-
 @keyframes dotBlink{
   0%, 20%   { opacity: 0; transform: translateY(0); }
   50%       { opacity: 1; transform: translateY(-1px); }
   100%      { opacity: 0; transform: translateY(0); }
 }
+
+/* ================= Card grid preview ================= */
+.card-grid{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+  gap:12px; margin-top:14px;
+}
+.card-grid .card{
+  position: relative; /* for qty badge */
+  aspect-ratio:63/88;
+  background:#f4f7f5; border:1px solid #e7eee9; border-radius:var(--radius-ssm);
+  overflow:hidden; box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+.card-grid .card img{ width:100%; height:100%; object-fit:cover; display:block; }
+
+/* quantity badge (overview only) */
+.qty-badge{
+  position:absolute;
+  right:6px;
+  top:6px;
+  padding: 2px 8px;
+  border-radius: var(--radius-ssm);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 800;
+  color: #fff;
+
+  background: linear-gradient(180deg, var(--forest-500), var(--forest-700));
+  border: 1px solid rgba(255,255,255,.18);
+  box-shadow:
+    0 4px 10px rgba(0,0,0,.18),
+    inset 0 0 0 1px rgba(255,255,255,.08);
+  user-select: none;
+  pointer-events: none; /* purely decorative */
+}
+
+/* optional: hide badge when quantity is 1 */
+.qty-badge { display: none; }
+.card[aria-label*="quantity 1"] .qty-badge { display: none; }
+

@@ -31,7 +31,7 @@ const CONFIG = {
   BACK_IMAGE_URL: 'https://i.imgur.com/LdOBU1I.jpeg',
 
   // Canvas pixel density (used to size the canvases to the physical page)
-  CANVAS_DPI: 96                   // pixels per inch for the canvas drawing of cutlines & bg panel
+  CANVAS_DPI: 96                   // px per inch for the canvas drawing of cutlines & bg panel
 };
 // ----------------------------------------
 
@@ -85,12 +85,23 @@ async function loadDeck() {
     }
 
     data.images.forEach(card => {
+      const qty = Number(card.quantity ?? 1);
+
       const div = document.createElement('div');
       div.className = 'card';
+      div.setAttribute('aria-label', `${card.name} – quantity ${qty}`);
+
       const img = document.createElement('img');
       img.src = card.img;
       img.alt = card.name;
+
+      // quantity badge (overview only)
+      const badge = document.createElement('span');
+      badge.className = 'qty-badge';
+      badge.textContent = `×${qty}`;
+
       div.appendChild(img);
+      div.appendChild(badge);
       grid.appendChild(div);
     });
 
@@ -136,7 +147,7 @@ function choosePageGeometry(sizeKey, gapmm) {
  * Print view with options:
  * - spaceBetweenToggle: adds GAP_WHEN_ENABLED_MM gaps between cards (cards remain 63x88mm).
  * - backSideToggle: inserts a matching "backs" page after each fronts page.
- *   Backs are ALWAYS full-page grids (9 for A4, 18 for A3) and perfectly centered.
+ *   Backs are ALWAYS full-page grids and perfectly centered.
  * - blackBackgroundToggle: draws a CANVAS at the lowest z-index (−5) so PDF includes it.
  * - cutLinesToggle: per-card corner crop marks (2mm lines, start 0.5mm from edges).
  * - pageSizeToggle: toggles between A4 (unchecked) and A3 (checked).
@@ -295,10 +306,6 @@ function openPrintView() {
           if (USE_BLACK_BG) {
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-          } else {
-            // transparent; uncomment to force white
-            // ctx.fillStyle = '#FFFFFF';
-            // ctx.fillRect(0, 0, canvas.width, canvas.height);
           }
         });
 
@@ -390,11 +397,12 @@ function openPrintView() {
 
 // ================= Spinner icon + rotating messages =================
 const spinnerIcon = document.getElementById('spinnerIcon');
-// IMPORTANT: match filename case with your actual files
+
+// IMPORTANT: match filename case with your actual files on disk
 const iconPaths = [
-  'public/icons/FF-ICON-1.PNG',
-  'public/icons/FF-ICON-2.PNG',
-  'public/icons/FF-ICON-3.PNG'
+  'public/icons/FF-ICON-1.png',
+  'public/icons/FF-ICON-2.png',
+  'public/icons/FF-ICON-3.png'
 ];
 
 // Lines that rotate along with the icon
@@ -413,7 +421,7 @@ function updateLoadingCopy(index) {
   const quipEl = document.querySelector('#loading .spinner-copy .quip');
   const hintEl = document.querySelector('#loading .spinner-copy .hint');
   if (quipEl) {
-    // preserve the animated dots
+    // preserve the animated dots span
     quipEl.innerHTML = `${quips[index % quips.length]} <span class="dots"><span>•</span><span>•</span><span>•</span></span>`;
   }
   if (hintEl) {
