@@ -5,14 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Eris Proxies</title>
   <link rel="stylesheet" href="style.css" />
+
+  <!-- Favicon(s) -->
   <link rel="icon" type="image/png" sizes="16x16" href="public/icons/ERIS-PROXIES-ICON.png">
   <link rel="icon" type="image/png" sizes="32x32" href="public/icons/ERIS-PROXIES-ICON.png">
+  <!-- Preload the logo so it appears instantly -->
+  <link rel="preload" as="image" href="public/icons/ERIS-PROXIES-ICON.png" />
 </head>
 <body>
   <div class="container">
     <header class="brand">
-      <h1 class="brand-title">Eris Proxies</h1>
-      <p class="brand-sub">Deck & Proxy Print Templater</p>
+      <div class="brand-row">
+        <!-- 🔰 Logo before the title -->
+        <img
+          class="brand-logo"
+          src="public/icons/ERIS-PROXIES-ICON.png"
+          alt="Eris Proxies logo"
+          width="56"
+          height="56"
+          decoding="async"
+        />
+        <div class="brand-text">
+          <h1 class="brand-title">Eris Proxies</h1>
+          <p class="brand-sub">Deck & Proxy Print Templater</p>
+        </div>
+      </div>
     </header>
 
     <div class="input-group">

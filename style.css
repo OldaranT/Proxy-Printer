@@ -21,7 +21,7 @@
   --stone-200:#e7eee9;
   --stone-300:#c8d6cf;
 
-  /* radii (less rounded than before) */
+  /* radii (subtle) */
   --radius-ssm:3px;
   --radius-sm:8px;
   --radius-md:10px;
@@ -38,7 +38,6 @@ body{
   margin:0;
   font-family: system-ui,-apple-system,Segoe UI,Roboto,Inter,Ubuntu,'Helvetica Neue',Arial,sans-serif;
   color:var(--ink);
-  /* layered, light, forest-tinted background */
   background:
     radial-gradient(1200px 600px at 85% -10%, rgba(33,160,106,.14), rgba(33,160,106,0) 60%),
     radial-gradient(800px 400px at -10% 110%, rgba(15,61,46,.12), rgba(15,61,46,0) 55%),
@@ -48,22 +47,51 @@ body{
 /* ================= Container & Brand ================= */
 .container{max-width:980px;margin:36px auto 40px;padding:0 16px;}
 .brand{margin-bottom:16px}
+
+/* NEW: compact row with logo + text */
+.brand-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+.brand-logo{
+  width:56px;
+  height:56px;
+  object-fit:contain;
+  border:0;
+  border-radius:50%;
+  background:transparent;
+
+  /* subtle, natural shadow */
+  box-shadow:
+    0 8px 22px rgba(0,0,0,.22),
+    0 2px 6px rgba(0,0,0,.18);
+}
+
+.brand-text{display:flex; flex-direction:column; gap:4px}
+
 .brand-title{
   margin:0;
   font-size:36px;
   line-height:1.1;
   letter-spacing:.3px;
-  /* subtle gradient title */
   background:linear-gradient(90deg,var(--forest-700),var(--forest-400));
   -webkit-background-clip:text;background-clip:text;
   color:transparent;
   text-shadow:0 1px 0 rgba(255,255,255,.35);
 }
 .brand-sub{
-  margin:6px 0 0;
+  margin:0;
   color:#345348;
   font-weight:600;
   letter-spacing:.2px;
+}
+
+/* Responsive: make logo/title a bit smaller on phones */
+@media (max-width: 520px){
+  .brand-logo{ width:44px; height:44px; border-radius:10px }
+  .brand-title{ font-size:28px }
 }
 
 /* ================= Inputs & Buttons ================= */
@@ -73,7 +101,7 @@ body{
   height:44px;
   padding:0 14px;
   border:1px solid #dfe7e3;
-  border-radius:var(--radius-md);
+  border-radius:var(--radius-ssm);
   font-size:14px;
   outline:none;
   background:#fff;
@@ -81,7 +109,7 @@ body{
 }
 .input-group .actions{display:flex;gap:8px}
 .btn{
-  height:44px; padding:0 14px; border-radius:var(--radius-md);
+  height:44px; padding:0 14px; border-radius:var(--radius-ssm);
   border:0; cursor:pointer;
   background:linear-gradient(180deg,var(--forest-600),var(--forest-700));
   color:#fff; font-weight:700; letter-spacing:.2px;
@@ -104,7 +132,6 @@ body{
   margin:18px 0 8px;
 }
 
-/* Toggle block — less rounded than pills */
 .toggle{
   display:flex; align-items:center; gap:12px;
   padding:10px 12px;
@@ -147,7 +174,7 @@ body{
 }
 .switch .track{
   position:absolute; inset:0;
-  border-radius:14px; /* was 9999px; now subtler */
+  border-radius:14px;
   background: #eef5f1;
   border:1px solid #d6e3dc;
   box-shadow: inset 0 2px 6px rgba(0,0,0,.10);
@@ -155,7 +182,7 @@ body{
 }
 .switch .thumb{
   position:absolute; top:50%; left:6px;
-  width:26px; height:26px; border-radius:10px; /* less round */
+  width:26px; height:26px; border-radius:10px;
   background:#fff;
   transform: translateY(-50%);
   box-shadow: 0 3px 10px rgba(0,0,0,.25);
