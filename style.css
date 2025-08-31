@@ -256,7 +256,7 @@ body::before{
   user-select:none; pointer-events:none;
 }
 /* hide when quantity is 1 (your preference) */
-.card[aria-label*="quantity 1"] .qty-badge { display: none; }
+/* .card[aria-label*="quantity 1"] .qty-badge { display: none; } */
 
 /* ================= Modal (click preview) ================= */
 body.modal-open{ overflow: hidden; }
