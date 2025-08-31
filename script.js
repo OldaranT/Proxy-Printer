@@ -1,21 +1,35 @@
 // script.js
 
-// ---------- Tweakable constants (mm / px / colors) ----------
+// ---------- Tweakable constants ----------
 const CONFIG = {
-  PAGE_MM: { W: 210, H: 297 },          // A4
-  CARD_MM: { W: 63, H: 88 },            // MTG proxy size
-  GRID: { COLS: 3, ROWS: 3 },           // 3x3 per page
-  GAP_WHEN_ENABLED_MM: 6,               // <-- space between cards when toggle ON
-  CUTLINE: {
-    OFFSET_FROM_EDGE_MM: 0.5,           // <-- start 0.5mm away from card edge
-    LENGTH_MM: 2,                       // <-- each crop mark is 2mm long
-    STROKE_PX: 1.2,                     // stroke width in canvas pixels
-    COLOR: '#00ff00'                    // crop mark color
+  // Supported page sizes (portrait, in mm)
+  PAGE_SIZES_MM: {
+    A4: { W: 210, H: 297 },
+    A3: { W: 297, H: 420 }
   },
-  BACK_IMAGE_URL: 'https://i.imgur.com/LdOBU1I.jpeg', // <-- backs image
-  CANVAS_PX: { W: 794, H: 1123 }        // ~96 DPI mapping for A4
+  DEFAULT_PAGE: 'A4',              // starting size if your toggle is unchecked
+
+  // Card geometry (mm)
+  CARD_MM: { W: 63, H: 88 },
+
+  // Spacing
+  GAP_WHEN_ENABLED_MM: 6,          // space between cards when "spaceBetween" toggle is ON
+
+  // Cutline (corner crop marks) styling
+  CUTLINE: {
+    OFFSET_FROM_EDGE_MM: 0.5,      // space from card edge to start of each crop mark
+    LENGTH_MM: 2,                  // length of each crop mark line
+    STROKE_PX: 1.2,                // stroke width (canvas pixels)
+    COLOR: '#00ff00'               // crop mark color
+  },
+
+  // Back image for duplex printing
+  BACK_IMAGE_URL: 'https://i.imgur.com/LdOBU1I.jpeg',
+
+  // Canvas pixel density (used to size the canvas to the physical page)
+  CANVAS_DPI: 96                   // pixels per inch for the canvas drawing of cutlines
 };
-// ------------------------------------------------------------
+// ----------------------------------------
 
 let cachedImages = [];
 let cachedDeckName = "Deck";
@@ -23,10 +37,15 @@ let cachedDeckName = "Deck";
 document.addEventListener('DOMContentLoaded', () => {
   const cutlineToggleWrapper = document.getElementById('cutlineToggleWrapper');
   const cutlineToggleCheckbox = document.getElementById('cutlineToggle');
+
   const spaceBetweenToggleWrapper = document.getElementById('spaceBetweenToggleWrapper');
   const spaceBetweenToggleCheckbox = document.getElementById('spaceBetweenToggle');
+
   const showBackgroundToggleWrapper = document.getElementById('showBackgroundToggleWrapper');
   const showBackgroundToggleCheckbox = document.getElementById('showBackgroundToggle');
+
+  const pageSizeToggleWrapper = document.getElementById('pageSizeToggleWrapper');
+  const pageSizeToggleCheckbox = document.getElementById('pageSizeToggle');
 
   // Wrapper click -> toggle checkbox + active class
   if (cutlineToggleWrapper && cutlineToggleCheckbox) {
@@ -50,6 +69,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  if (pageSizeToggleWrapper && pageSizeToggleCheckbox) {
+    pageSizeToggleWrapper.addEventListener('click', () => {
+      pageSizeToggleCheckbox.checked = !pageSizeToggleCheckbox.checked;
+      pageSizeToggleWrapper.classList.toggle('active', pageSizeToggleCheckbox.checked);
+    });
+  }
+
   // Ensure initial state is synced
   if (cutlineToggleWrapper && cutlineToggleCheckbox) {
     cutlineToggleWrapper.classList.toggle('active', cutlineToggleCheckbox.checked);
@@ -59,6 +85,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   if (showBackgroundToggleWrapper && showBackgroundToggleCheckbox) {
     showBackgroundToggleWrapper.classList.toggle('active', showBackgroundToggleCheckbox.checked);
+  }
+  if (pageSizeToggleWrapper && pageSizeToggleCheckbox) {
+    // If you want A3 by default, set the checkbox default in HTML or flip this line
+    pageSizeToggleWrapper.classList.toggle('active', pageSizeToggleCheckbox.checked);
   }
 });
 
@@ -126,12 +156,21 @@ async function loadDeck() {
 }
 
 /**
+ * Compute max grid that fits on a page given physical dimensions and gap.
+ * Returns { cols, rows } with minimum of 1 each.
+ */
+function computeGridDims(pageWmm, pageHmm, cardWmm, cardHmm, gapmm) {
+  const cols = Math.max(1, Math.floor((pageWmm + gapmm) / (cardWmm + gapmm)));
+  const rows = Math.max(1, Math.floor((pageHmm + gapmm) / (cardHmm + gapmm)));
+  return { cols, rows };
+}
+
+/**
  * Print view with options:
  * - spaceBetweenToggle: adds GAP_WHEN_ENABLED_MM gaps between cards (cards remain 63x88mm).
- * - showBackgroundToggle: inserts a matching "backs" page after each fronts page,
- *   using CONFIG.BACK_IMAGE_URL. Layout & cutlines are identical so duplex prints align.
- * - Cutlines: per-card corner crop marks — two outgoing lines (H+V) of LENGTH_MM,
- *   starting OFFSET_FROM_EDGE_MM away from each corner.
+ * - showBackgroundToggle: inserts a matching "backs" page after each fronts page (duplex aligned).
+ * - cutlineToggle: corner crop marks per card (two lines, 2mm long, starting 0.5mm from each corner).
+ * - pageSizeToggle: toggles between A4 (unchecked) and A3 (checked).
  */
 function openPrintView() {
   if (!cachedImages.length) return;
@@ -141,24 +180,35 @@ function openPrintView() {
   const addSpaceBetween = document.getElementById('spaceBetweenToggle')?.checked;
   const addBackground = document.getElementById('showBackgroundToggle')?.checked;
 
-  // --- Physical constants (mm) ---
-  const PAGE_W = CONFIG.PAGE_MM.W;
-  const PAGE_H = CONFIG.PAGE_MM.H;
+  // Page size toggle: unchecked => A4, checked => A3
+  const useA3 = document.getElementById('pageSizeToggle')?.checked || false;
+  const sizeKey = useA3 ? 'A3' : CONFIG.DEFAULT_PAGE; // DEFAULT_PAGE is 'A4' unless you change it
+  const PAGE_W = CONFIG.PAGE_SIZES_MM[sizeKey].W;
+  const PAGE_H = CONFIG.PAGE_SIZES_MM[sizeKey].H;
+
+  // Geometry (mm)
   const CARD_W = CONFIG.CARD_MM.W;
   const CARD_H = CONFIG.CARD_MM.H;
   const GAP = addSpaceBetween ? CONFIG.GAP_WHEN_ENABLED_MM : 0;
 
-  // Derived sheet dimensions (3x3 grid)
-  const SHEET_W = CONFIG.GRID.COLS * CARD_W + (CONFIG.GRID.COLS - 1) * GAP;
-  const SHEET_H = CONFIG.GRID.ROWS * CARD_H + (CONFIG.GRID.ROWS - 1) * GAP;
+  // Compute grid (dynamic: more cards on A3)
+  const { cols: GRID_COLS, rows: GRID_ROWS } = computeGridDims(PAGE_W, PAGE_H, CARD_W, CARD_H, GAP);
 
-  // Center the sheet on A4 so everything fits while preserving card size
+  // Derived sheet dimensions (centered on page)
+  const SHEET_W = GRID_COLS * CARD_W + (GRID_COLS - 1) * GAP;
+  const SHEET_H = GRID_ROWS * CARD_H + (GRID_ROWS - 1) * GAP;
   const MARGIN_L = Math.max(0, (PAGE_W - SHEET_W) / 2);
   const MARGIN_T = Math.max(0, (PAGE_H - SHEET_H) / 2);
+
+  // Canvas size in pixels based on physical page dimensions
+  const MM_PER_IN = 25.4;
+  const CANVAS_W_PX = Math.round((PAGE_W / MM_PER_IN) * CONFIG.CANVAS_DPI);
+  const CANVAS_H_PX = Math.round((PAGE_H / MM_PER_IN) * CONFIG.CANVAS_DPI);
 
   const cards = cachedImages.flatMap(card => Array(card.quantity).fill(card.img));
   const titleBits = [
     deckName,
+    sizeKey,
     showCutlines ? '(cutlines)' : '(no cutlines)',
     addSpaceBetween ? `(${GAP}mm gaps)` : '(tight)',
     addBackground ? '(with backs)' : ''
@@ -167,7 +217,7 @@ function openPrintView() {
 
   const win = window.open('', '_blank');
 
-  // Helper to build one "front" page (or "back" page if isBack=true)
+  // Build one page's HTML (front or back). Back uses the same geometry.
   function buildPageHTML(imgSrcs, isBack = false) {
     const imgs = isBack ? new Array(imgSrcs.length).fill(CONFIG.BACK_IMAGE_URL) : imgSrcs;
     const imagesHTML = imgs.map(src => `<img src="${src}" alt="${isBack ? 'Card back' : 'Card front'}" />`).join('');
@@ -179,23 +229,24 @@ function openPrintView() {
           left:${MARGIN_L}mm;
           width:${SHEET_W}mm;
           height:${SHEET_H}mm;
-          grid-template-columns: repeat(${CONFIG.GRID.COLS}, ${CARD_W}mm);
-          grid-template-rows: repeat(${CONFIG.GRID.ROWS}, ${CARD_H}mm);
+          grid-template-columns: repeat(${GRID_COLS}, ${CARD_W}mm);
+          grid-template-rows: repeat(${GRID_ROWS}, ${CARD_H}mm);
           gap:${GAP}mm;">
           ${imagesHTML}
         </div>
         <div class="cutlines" style="display:${showCutlines ? 'block' : 'none'};">
-          <canvas width="${CONFIG.CANVAS_PX.W}" height="${CONFIG.CANVAS_PX.H}"></canvas>
+          <canvas width="${CANVAS_W_PX}" height="${CANVAS_H_PX}"></canvas>
         </div>
       </div>
     `;
   }
 
-  // Build all pages (fronts, then optional matching backs)
+  // Build all pages (fronts + optional backs)
   const pages = [];
-  for (let i = 0; i < cards.length; i += (CONFIG.GRID.COLS * CONFIG.GRID.ROWS)) {
-    const chunk = cards.slice(i, i + (CONFIG.GRID.COLS * CONFIG.GRID.ROWS));
-    pages.push(buildPageHTML(chunk, false));       // Fronts
+  const pageCapacity = GRID_COLS * GRID_ROWS;
+  for (let i = 0; i < cards.length; i += pageCapacity) {
+    const chunk = cards.slice(i, i + pageCapacity);
+    pages.push(buildPageHTML(chunk, false));        // Fronts
     if (addBackground) pages.push(buildPageHTML(chunk, true)); // Backs
   }
 
@@ -204,7 +255,7 @@ function openPrintView() {
     <head>
       <title>Print Template</title>
       <style>
-        @page { size: A4 portrait; margin: 0; }
+        @page { size: ${PAGE_W}mm ${PAGE_H}mm; margin: 0; }
         html, body { margin: 0; padding: 0; background: white; }
         .page {
           position: relative;
@@ -236,11 +287,19 @@ function openPrintView() {
       <script>
         document.title = ${JSON.stringify(title)};
 
-        // Corner crop marks (two lines per corner) constants
+        // Cutline config (injected constants)
         const OFFSET_MM = ${CONFIG.CUTLINE.OFFSET_FROM_EDGE_MM};
         const LENGTH_MM = ${CONFIG.CUTLINE.LENGTH_MM};
         const STROKE_PX = ${CONFIG.CUTLINE.STROKE_PX};
         const COLOR = ${JSON.stringify(CONFIG.CUTLINE.COLOR)};
+
+        const PAGE_W = ${PAGE_W};
+        const PAGE_H = ${PAGE_H};
+        const CARD_W = ${CARD_W};
+        const CARD_H = ${CARD_H};
+        const GAP = ${GAP};
+        const GRID_COLS = ${GRID_COLS};
+        const GRID_ROWS = ${GRID_ROWS};
 
         function drawCornerMarks(ctx, x, y, w, h, pxPerMM_X, pxPerMM_Y) {
           const offX = OFFSET_MM * pxPerMM_X;
@@ -253,9 +312,9 @@ function openPrintView() {
 
           // TOP-LEFT
           ctx.beginPath();
-          ctx.moveTo(x - offX - lenX, y);        // horizontal outward
+          ctx.moveTo(x - offX - lenX, y);  // horizontal outward
           ctx.lineTo(x - offX, y);
-          ctx.moveTo(x, y - offY - lenY);        // vertical outward
+          ctx.moveTo(x, y - offY - lenY);  // vertical outward
           ctx.lineTo(x, y - offY);
           ctx.stroke();
 
@@ -284,30 +343,38 @@ function openPrintView() {
           ctx.stroke();
         }
 
-        const canvases = document.querySelectorAll('.cutlines canvas');
-        canvases.forEach(canvas => {
+        // Draw for each page
+        document.querySelectorAll('.cutlines canvas').forEach(canvas => {
           const ctx = canvas.getContext('2d');
-          const pxPerMM_X = canvas.width / ${PAGE_W};
-          const pxPerMM_Y = canvas.height / ${PAGE_H};
+          const pxPerMM_X = canvas.width / PAGE_W;
+          const pxPerMM_Y = canvas.height / PAGE_H;
 
-          const left = ${MARGIN_L} * pxPerMM_X;
-          const top = ${MARGIN_T} * pxPerMM_Y;
-          const cardW = ${CARD_W} * pxPerMM_X;
-          const cardH = ${CARD_H} * pxPerMM_Y;
-          const gapX = ${GAP} * pxPerMM_X;
-          const gapY = ${GAP} * pxPerMM_Y;
+          // Read sheet position from inline style to stay exact
+          const sheet = canvas.parentElement.previousElementSibling;
+          const style = sheet.style;
+
+          const leftMM = parseFloat(style.left);
+          const topMM = parseFloat(style.top);
+
+          const left = leftMM * pxPerMM_X;
+          const top  = topMM  * pxPerMM_Y;
+
+          const cardW = CARD_W * pxPerMM_X;
+          const cardH = CARD_H * pxPerMM_Y;
+          const gapX  = GAP * pxPerMM_X;
+          const gapY  = GAP * pxPerMM_Y;
 
           // Loop grid and draw corner marks for each card
-          for (let row = 0; row < ${CONFIG.GRID.ROWS}; row++) {
-            for (let col = 0; col < ${CONFIG.GRID.COLS}; col++) {
+          for (let row = 0; row < GRID_ROWS; row++) {
+            for (let col = 0; col < GRID_COLS; col++) {
               const x = left + col * (cardW + gapX);
-              const y = top + row * (cardH + gapY);
+              const y = top  + row * (cardH + gapY);
               drawCornerMarks(ctx, x, y, cardW, cardH, pxPerMM_X, pxPerMM_Y);
             }
           }
         });
 
-        // Wait for all images to load before printing (ensures backs/fronts present)
+        // Wait for all images to load before printing (ensures backs/fronts are present)
         function whenImagesLoaded() {
           const imgs = Array.from(document.images);
           const pending = imgs.filter(img => !img.complete || img.naturalWidth === 0);
