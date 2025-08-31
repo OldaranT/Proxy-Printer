@@ -22,6 +22,7 @@
   --stone-300:#c8d6cf;
 
   /* radii (less rounded than before) */
+  --radius-ssm:3px;
   --radius-sm:8px;
   --radius-md:10px;
   --radius-lg:12px;
@@ -107,7 +108,7 @@ body{
 .toggle{
   display:flex; align-items:center; gap:12px;
   padding:10px 12px;
-  border-radius:var(--radius-lg);
+  border-radius:var(--radius-ssm);
   color:#fff;
   background: linear-gradient(180deg, var(--forest-700), var(--forest-800));
   border:1px solid rgba(255,255,255,.06);
@@ -198,7 +199,7 @@ body{
 }
 .card-grid .card{
   aspect-ratio:63/88;
-  background:#f4f7f5; border:1px solid #e7eee9; border-radius:var(--radius-lg);
+  background:#f4f7f5; border:1px solid #e7eee9; border-radius:var(--radius-ssm);
   overflow:hidden; box-shadow: 0 2px 8px rgba(0,0,0,.06);
 }
 .card-grid .card img{ width:100%; height:100%; object-fit:cover; display:block; }
