@@ -63,13 +63,14 @@ body::before{
 .container{max-width:980px;margin:36px auto 40px;padding:0 16px;}
 .brand{margin-bottom:16px}
 
+/* compact row with logo + text */
 .brand-row{
   display:flex;
   align-items:center;
   gap:12px;
 }
 
-/* Logo: round PNG with a soft drop shadow (no background/border) */
+/* round PNG logo with soft shadow */
 .brand-logo{
   width:56px;
   height:56px;
@@ -142,7 +143,6 @@ body::before{
   display:flex; flex-wrap:wrap; gap:12px 16px; align-items:stretch;
   margin:18px 0 8px;
 }
-
 .toggle{
   display:flex; align-items:center; gap:12px;
   padding:10px 12px;
@@ -172,21 +172,17 @@ body::before{
 }
 .toggle:has(input:checked) .state-on{opacity:1}
 .toggle:has(input:checked) .state-off{opacity:.45}
-@supports not(selector(:has(*))){
-  .toggle .state-on, .toggle .state-off{opacity:1}
-}
+@supports not(selector(:has(*))){ .toggle .state-on, .toggle .state-off{opacity:1} }
 
 /* Switch (track & thumb) */
 .switch{
   position:relative; display:inline-block; width:66px; height:36px; flex:0 0 auto;
 }
-.switch input{
-  position:absolute; inset:0; margin:0; opacity:0; cursor:pointer;
-}
+.switch input{ position:absolute; inset:0; margin:0; opacity:0; cursor:pointer; }
 .switch .track{
   position:absolute; inset:0;
   border-radius:14px;
-  background: #eef5f1;
+  background:#eef5f1;
   border:1px solid #d6e3dc;
   box-shadow: inset 0 2px 6px rgba(0,0,0,.10);
   transition: background .2s ease, border-color .2s ease, box-shadow .2s ease;
@@ -202,8 +198,8 @@ body::before{
 .switch:hover .thumb{ transform: translateY(-50%) scale(1.04) }
 .switch input:focus-visible + .track{ outline:3px solid var(--mint-200); outline-offset:2px }
 .switch input:checked + .track{
-  background: linear-gradient(180deg, var(--forest-400), var(--forest-500));
-  border-color: #16764e;
+  background: linear-gradient(180deg, var(--forest-400),var(--forest-500));
+  border-color:#16764e;
   box-shadow: inset 0 2px 4px rgba(0,0,0,.15);
 }
 .switch input:checked + .track .thumb{
@@ -217,7 +213,7 @@ body::before{
   position:fixed; inset:0; backdrop-filter:saturate(120%) blur(1.5px);
   background: rgba(255,255,255,.6);
   display:flex;
-  flex-direction: column;
+  flex-direction: column;   /* stack spinner above text */
   align-items:center;
   justify-content:center;
   z-index:9999;
@@ -273,15 +269,18 @@ body::before{
 .dots span:nth-child(2){ animation-delay: .15s; }
 .dots span:nth-child(3){ animation-delay: .30s; }
 @keyframes dotBlink{
-  0%, 20%   { opacity: 0; transform: translateY(0); }
-  50%       { opacity: 1; transform: translateY(-1px); }
-  100%      { opacity: 0; transform: translateY(0); }
+  0%, 20%{ opacity: 0; transform: translateY(0); }
+  50%    { opacity: 1; transform: translateY(-1px); }
+  100%   { opacity: 0; transform: translateY(0); }
 }
 
 /* ================= Card grid preview ================= */
 .card-grid{
-  display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
-  gap:12px; margin-top:14px;
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+  gap:12px;
+  margin-top:14px;
+  overflow: visible; /* allow pop-outs to overflow */
 }
 
 /* Card tile: absolute image layer + overlay badge */
@@ -291,53 +290,85 @@ body::before{
   background:#f4f7f5;
   border:1px solid #e7eee9;
   border-radius:var(--radius-ssm);
-  overflow:hidden;
+  overflow:hidden;                    /* keeps corners tidy */
   box-shadow: 0 2px 8px rgba(0,0,0,.06);
-  z-index: 0;                         /* create stacking context */
+  z-index: 0;                         /* stacking baseline */
+
+  /* pop-out animation */
+  transform-origin: center center;
+  transition: transform .16s ease, box-shadow .18s ease, z-index 0s;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 /* Image fills tile below overlays */
 .card-grid .card img{
-  position: absolute;
-  inset: 0;
+  position:absolute;
+  inset:0;
   width:100%;
   height:100%;
   object-fit:cover;
   display:block;
-  z-index: 1;
+  z-index:1;
 }
 
-/* Quantity badge — forced size so DevTools shows px, and stacks above image */
+/* Quantity badge — responsive bottom-right anchor */
 .qty-badge{
   position:absolute;
-  z-index: 2;
-  top:178px;
+  z-index:2;
   right:6px;
+  bottom:6px;
 
   display:inline-flex;
   align-items:center;
   justify-content:center;
 
-  min-width: 24px;
-  height: 20px;
-  padding: 0 8px;
+  min-width:24px;
+  height:20px;
+  padding:0 8px;
 
-  border-radius: var(--radius-ssm);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1;
-  color: #fff;
+  border-radius:var(--radius-ssm);
+  font-size:12px;
+  font-weight:800;
+  line-height:1;
+  color:#fff;
 
   background: linear-gradient(180deg, var(--forest-500), var(--forest-700));
-  border: 1px solid rgba(255,255,255,.18);
+  border:1px solid rgba(255,255,255,.18);
   box-shadow:
     0 4px 10px rgba(0,0,0,.18),
     inset 0 0 0 1px rgba(255,255,255,.08);
 
-  user-select: none;
-  pointer-events: none; /* purely decorative */
+  user-select:none;
+  pointer-events:none; /* decorative */
+}
+
+/* ===== Hover pop-out preview (bigger) ===== */
+.card-grid .card:hover{
+  transform: scale(3.0); /* bigger than before */
+  z-index:50;
+  box-shadow:
+    0 22px 56px rgba(0,0,0,.38),
+    0 8px 20px rgba(0,0,0,.28);
+}
+
+/* Hide the quantity badge while hovered */
+.card-grid .card:hover .qty-badge{
+  opacity:0;
+  transition: opacity .12s ease;
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce){
+  .card-grid .card{ transition: none; }
+  .card-grid .card:hover{ transform: none; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .card-grid .card:hover .qty-badge{ opacity: 1; }
+}
+
+/* Slightly smaller pop-out on narrow screens */
+@media (max-width: 520px){
+  .card-grid .card:hover{ transform: scale(1.6); }
 }
 
 /* optional: hide badge when quantity is 1 */
 .card[aria-label*="quantity 1"] .qty-badge { display: none; }
-
