@@ -43,6 +43,26 @@ document.addEventListener('DOMContentLoaded', () => {
   // No JS needed for slider styling; hook available if you want listeners later.
 });
 
+// =============== Helpers for quantity ===============
+function clampQty(n) {
+  n = Number.isFinite(+n) ? +n : 0;
+  return Math.max(0, Math.floor(n));
+}
+function setCardQuantity(index, qty) {
+  if (!cachedImages[index]) return;
+  const newQty = clampQty(qty);
+  cachedImages[index].quantity = newQty;
+
+  // Update tile badge + a11y label live
+  const tile = document.querySelector(`.card[data-index="${index}"]`);
+  if (tile) {
+    const badge = tile.querySelector('.qty-badge');
+    if (badge) badge.textContent = `×${newQty}`;
+    const name = cachedImages[index].name ?? 'Card';
+    tile.setAttribute('aria-label', `${name} – quantity ${newQty}`);
+  }
+}
+
 function extractDeckUrl(url) {
   return url.trim();
 }
@@ -84,28 +104,38 @@ async function loadDeck() {
       throw new Error("No images returned.");
     }
 
-    data.images.forEach(card => {
-      const qty = Number(card.quantity ?? 1);
+    // Normalize and build tiles
+    cachedImages = data.images.map((card, i) => ({
+      ...card,
+      quantity: clampQty(card.quantity ?? 1),
+      _idx: i
+    }));
 
+    cachedImages.forEach((card, i) => {
       const div = document.createElement('div');
       div.className = 'card';
+      div.dataset.index = String(i);
+
+      const qty = clampQty(card.quantity);
       div.setAttribute('aria-label', `${card.name} – quantity ${qty}`);
 
       const img = document.createElement('img');
       img.src = card.img;
-      img.alt = card.name;
+      img.alt = card.name ?? 'Card';
 
-      // quantity badge (overview only)
+      // quantity badge (always shown; even ×0)
       const badge = document.createElement('span');
       badge.className = 'qty-badge';
       badge.textContent = `×${qty}`;
+
+      // click to open preview modal
+      div.addEventListener('click', () => openPreviewModal(i));
 
       div.appendChild(img);
       div.appendChild(badge);
       grid.appendChild(div);
     });
 
-    cachedImages = data.images;
     printBtn.disabled = false;
   } catch (err) {
     console.error("❌ Deck load failed:", err);
@@ -152,6 +182,7 @@ function choosePageGeometry(sizeKey, gapmm) {
  * - cutLinesToggle: per-card corner crop marks (2mm lines, start 0.5mm from edges).
  * - pageSizeToggle: toggles between A4 (unchecked) and A3 (checked).
  * - Auto orientation: chooses portrait/landscape to fit the MOST cards per page.
+ * - Cards with quantity 0 are excluded.
  */
 function openPrintView() {
   if (!cachedImages.length) return;
@@ -190,7 +221,11 @@ function openPrintView() {
   const CANVAS_W_PX = Math.round((PAGE_W / MM_PER_IN) * CONFIG.CANVAS_DPI);
   const CANVAS_H_PX = Math.round((PAGE_H / MM_PER_IN) * CONFIG.CANVAS_DPI);
 
-  const cards = cachedImages.flatMap(card => Array(card.quantity ?? 1).fill(card.img));
+  // Respect quantity, exclude 0
+  const cards = cachedImages.flatMap(card => {
+    const q = clampQty(card.quantity);
+    return q > 0 ? new Array(q).fill(card.img) : [];
+  });
   const perPage = GRID_COLS * GRID_ROWS;
 
   const titleBits = [
@@ -220,7 +255,7 @@ function openPrintView() {
 
         <!-- Centered sheet of cards -->
         <div class="sheet" style="
-          position:absolute;              /* CRITICAL: allow top/left to place grid */
+          position:absolute;
           top:${MARGIN_T}mm;
           left:${MARGIN_L}mm;
           width:${SHEET_W}mm;
@@ -246,8 +281,8 @@ function openPrintView() {
   const pages = [];
   for (let i = 0; i < cards.length; i += perPage) {
     const chunk = cards.slice(i, i + perPage);
-    pages.push(buildPageHTML(chunk, false));        // Fronts (may be partial on last page)
-    if (addBackground) pages.push(buildPageHTML(chunk, true)); // Backs (ALWAYS full grid)
+    pages.push(buildPageHTML(chunk, false));        // Fronts
+    if (addBackground) pages.push(buildPageHTML(chunk, true)); // Backs
   }
 
   const html = `
@@ -263,16 +298,13 @@ function openPrintView() {
           height: ${PAGE_H}mm;
           page-break-after: always;
           overflow: hidden;
-
-          /* Ensure a stacking context so negative z-index children stay behind
-             only within this page and don't slip under other pages */
           z-index: 0;
           isolation: isolate;
         }
-        .sheet { position: absolute; }  /* ensure top/left work if inline style is stripped */
+        .sheet { position: absolute; }
         .sheet img {
-          width: ${CARD_W}mm;
-          height: ${CARD_H}mm;
+          width: ${CONFIG.CARD_MM.W}mm;
+          height: ${CONFIG.CARD_MM.H}mm;
           object-fit: cover;
           display: block;
         }
@@ -292,8 +324,8 @@ function openPrintView() {
 
         const PAGE_W = ${PAGE_W};
         const PAGE_H = ${PAGE_H};
-        const CARD_W = ${CARD_W};
-        const CARD_H = ${CARD_H};
+        const CARD_W = ${CONFIG.CARD_MM.W};
+        const CARD_H = ${CONFIG.CARD_MM.H};
         const GAP = ${GAP};
         const GRID_COLS = ${GRID_COLS};
         const GRID_ROWS = ${GRID_ROWS};
@@ -320,9 +352,9 @@ function openPrintView() {
 
           // TOP-LEFT
           ctx.beginPath();
-          ctx.moveTo(x - offX - lenX, y);  // horizontal outward
+          ctx.moveTo(x - offX - lenX, y);
           ctx.lineTo(x - offX, y);
-          ctx.moveTo(x, y - offY - lenY);  // vertical outward
+          ctx.moveTo(x, y - offY - lenY);
           ctx.lineTo(x, y - offY);
           ctx.stroke();
 
@@ -351,7 +383,6 @@ function openPrintView() {
           ctx.stroke();
         }
 
-        // Draw cutlines for each page using the same center-based math (no DOM reads)
         document.querySelectorAll('.cutlines canvas').forEach(canvas => {
           const ctx = canvas.getContext('2d');
           const pxPerMM_X = canvas.width / PAGE_W;
@@ -374,7 +405,6 @@ function openPrintView() {
           }
         });
 
-        // Wait for all images to load before printing (ensures backs/fronts are present)
         function whenImagesLoaded() {
           const imgs = Array.from(document.images);
           const pending = imgs.filter(img => !img.complete || img.naturalWidth === 0);
@@ -393,6 +423,80 @@ function openPrintView() {
 
   win.document.write(html);
   win.document.close();
+}
+
+// =============== Preview Modal (click-to-zoom with quantity controls) ===============
+function openPreviewModal(index) {
+  const card = cachedImages[index];
+  if (!card) return;
+
+  // Prevent duplicate modals
+  if (document.getElementById('previewOverlay')) return;
+
+  document.body.classList.add('modal-open');
+
+  const overlay = document.createElement('div');
+  overlay.id = 'previewOverlay';
+  overlay.className = 'overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+
+  overlay.innerHTML = `
+    <div class="preview-card" role="document" aria-label="${card.name ?? 'Card preview'}">
+      <button class="preview-close" aria-label="Close">×</button>
+      <div class="preview-image-wrap">
+        <img src="${card.img}" alt="${card.name ?? 'Card'}">
+      </div>
+      <div class="preview-controls" data-index="${index}">
+        <button class="qty-btn minus" aria-label="Decrease quantity">−</button>
+        <span class="qty-display" aria-live="polite">×${clampQty(card.quantity)}</span>
+        <button class="qty-btn plus" aria-label="Increase quantity">+</button>
+      </div>
+    </div>
+  `;
+
+  // Close on overlay click (outside card)
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closePreviewModal();
+  });
+
+  // Close button
+  overlay.querySelector('.preview-close').addEventListener('click', closePreviewModal);
+
+  // Quantity controls
+  const controls = overlay.querySelector('.preview-controls');
+  controls.addEventListener('click', (e) => {
+    const btn = e.target.closest('.qty-btn');
+    if (!btn) return;
+    const idx = Number(controls.dataset.index);
+    const current = clampQty(cachedImages[idx]?.quantity ?? 0);
+    let next = current;
+    if (btn.classList.contains('minus')) next = Math.max(0, current - 1);
+    if (btn.classList.contains('plus')) next = current + 1;
+    setCardQuantity(idx, next);
+    controls.querySelector('.qty-display').textContent = `×${next}`;
+  });
+
+  // ESC to close
+  const onKey = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closePreviewModal();
+    }
+  };
+  document.addEventListener('keydown', onKey, { once: true });
+
+  // Append
+  document.body.appendChild(overlay);
+
+  // Focus close for accessibility
+  overlay.querySelector('.preview-close').focus();
+
+  function closePreviewModal() {
+    document.body.classList.remove('modal-open');
+    overlay.remove();
+    document.removeEventListener('keydown', onKey, { once: true });
+  }
 }
 
 // ================= Spinner icon + rotating messages =================
@@ -421,7 +525,6 @@ function updateLoadingCopy(index) {
   const quipEl = document.querySelector('#loading .spinner-copy .quip');
   const hintEl = document.querySelector('#loading .spinner-copy .hint');
   if (quipEl) {
-    // preserve the animated dots span
     quipEl.innerHTML = `${quips[index % quips.length]} <span class="dots"><span>•</span><span>•</span><span>•</span></span>`;
   }
   if (hintEl) {

@@ -60,7 +60,7 @@ body::before{
 }
 
 /* ================= Container & Brand ================= */
-.container{max-width:980px;margin:36px auto 40px;padding:0 16px;}
+.container{max-width:980px;margin:36px auto 40px;padding:0 16px; overflow: visible;}
 .brand{margin-bottom:16px}
 
 /* compact row with logo + text */
@@ -213,7 +213,7 @@ body::before{
   position:fixed; inset:0; backdrop-filter:saturate(120%) blur(1.5px);
   background: rgba(255,255,255,.6);
   display:flex;
-  flex-direction: column;   /* stack spinner above text */
+  flex-direction: column;
   align-items:center;
   justify-content:center;
   z-index:9999;
@@ -280,28 +280,24 @@ body::before{
   grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
   gap:12px;
   margin-top:14px;
-  overflow: visible; /* allow pop-outs to overflow */
+  overflow: visible;
+  position: relative;
+  isolation: isolate;
 }
 
 /* Card tile: absolute image layer + overlay badge */
 .card-grid .card{
-  position: relative;                 /* positioning context */
+  position: relative;
   aspect-ratio:63/88;
   background:#f4f7f5;
   border:1px solid #e7eee9;
   border-radius:var(--radius-ssm);
-  overflow:hidden;                    /* keeps corners tidy */
+  overflow:hidden;
   box-shadow: 0 2px 8px rgba(0,0,0,.06);
-  z-index: 0;                         /* stacking baseline */
-
-  /* pop-out animation */
-  transform-origin: center center;
-  transition: transform .16s ease, box-shadow .18s ease, z-index 0s;
-  will-change: transform;
-  backface-visibility: hidden;
+  z-index: 0;
+  cursor: zoom-in;
 }
 
-/* Image fills tile below overlays */
 .card-grid .card img{
   position:absolute;
   inset:0;
@@ -312,7 +308,7 @@ body::before{
   z-index:1;
 }
 
-/* Quantity badge — responsive bottom-right anchor */
+/* Quantity badge — bottom-right, always visible (×0 allowed) */
 .qty-badge{
   position:absolute;
   z-index:2;
@@ -327,7 +323,7 @@ body::before{
   height:20px;
   padding:0 8px;
 
-  border-radius:var(--radius-ssm);
+  border-radius: var(--radius-ssm);
   font-size:12px;
   font-weight:800;
   line-height:1;
@@ -340,35 +336,127 @@ body::before{
     inset 0 0 0 1px rgba(255,255,255,.08);
 
   user-select:none;
-  pointer-events:none; /* decorative */
+  pointer-events:none;
 }
 
-/* ===== Hover pop-out preview (bigger) ===== */
-.card-grid .card:hover{
-  transform: scale(3.0); /* bigger than before */
-  z-index:50;
+/* ================= Preview Modal (click-to-zoom) ================= */
+body.modal-open{ overflow: hidden; }
+
+.overlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(1px) saturate(110%);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index: 10000;
+  padding: 18px;
+  animation: fadeIn .12s ease-out;
+}
+@keyframes fadeIn{ from{ opacity: 0 } to{ opacity: 1 } }
+
+.preview-card{
+  position: relative;
+  width: min(90vw, 780px);
+  aspect-ratio: 63 / 88;
+  border-radius: var(--radius-sm);
   box-shadow:
-    0 22px 56px rgba(0,0,0,.38),
-    0 8px 20px rgba(0,0,0,.28);
+    0 24px 64px rgba(0,0,0,.45),
+    0 10px 28px rgba(0,0,0,.35);
+  background: #0b0f0d;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: popIn .12s ease-out;
+}
+@keyframes popIn{
+  from{ transform: scale(.97); opacity: 0; }
+  to  { transform: scale(1);   opacity: 1; }
 }
 
-/* Hide the quantity badge while hovered */
-.card-grid .card:hover .qty-badge{
-  opacity:0;
-  transition: opacity .12s ease;
+.preview-image-wrap{
+  position: relative;
+  flex: 1 1 auto;
+  overflow: hidden;
+  background: #000;
+}
+.preview-card img{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit: cover;
+  display:block;
 }
 
-/* Respect reduced motion preferences */
-@media (prefers-reduced-motion: reduce){
-  .card-grid .card{ transition: none; }
-  .card-grid .card:hover{ transform: none; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
-  .card-grid .card:hover .qty-badge{ opacity: 1; }
+/* Close button (top-right on card) */
+.preview-close{
+  position:absolute;
+  right:8px;
+  top:8px;
+  height:32px;
+  width:32px;
+  border: 1px solid rgba(255,255,255,.25);
+  border-radius: var(--radius-ssm);
+  background: rgba(0,0,0,.4);
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 5;
+}
+.preview-close:hover{
+  background: rgba(0,0,0,.55);
+  transform: translateY(-1px);
 }
 
-/* Slightly smaller pop-out on narrow screens */
+/* Controls under the card */
+.preview-controls{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, #0f1b14, #0a281c);
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+.qty-btn{
+  height:36px;
+  min-width: 40px;
+  padding: 0 10px;
+  border: 1px solid #16764e;
+  border-radius: var(--radius-ssm);
+  background: linear-gradient(180deg, var(--forest-500), var(--forest-700));
+  color: #fff;
+  font-weight: 900;
+  font-size: 18px;
+  cursor: pointer;
+  box-shadow: var(--shadow-soft);
+}
+.qty-btn:hover{
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+}
+.qty-btn:active{ transform: translateY(0) }
+
+.qty-display{
+  min-width: 60px;
+  text-align:center;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: .3px;
+  font-size: 16px;
+}
+
+/* Accessibility */
+.preview-card:focus, .preview-close:focus, .qty-btn:focus{
+  outline: 3px solid var(--mint-200);
+  outline-offset: 2px;
+}
+
+/* Responsive modal sizing */
 @media (max-width: 520px){
-  .card-grid .card:hover{ transform: scale(1.6); }
+  .preview-card{ width: 92vw; }
 }
-
-/* optional: hide badge when quantity is 1 */
-.card[aria-label*="quantity 1"] .qty-badge { display: none; }
