@@ -110,7 +110,6 @@ body::before{
 
 /* Responsive: make logo/title a bit smaller on phones */
 @media (max-width: 520px){
-  .brand-logo{ width:44px; height:44px; border-radius:10px }
   .brand-title{ font-size:28px }
 }
 
