@@ -1,5 +1,22 @@
 // script.js
 
+// ---------- Tweakable constants (mm / px / colors) ----------
+const CONFIG = {
+  PAGE_MM: { W: 210, H: 297 },          // A4
+  CARD_MM: { W: 63, H: 88 },            // MTG proxy size
+  GRID: { COLS: 3, ROWS: 3 },           // 3x3 per page
+  GAP_WHEN_ENABLED_MM: 6,               // <-- space between cards when toggle ON
+  CUTLINE: {
+    OFFSET_FROM_EDGE_MM: 0.5,           // <-- start 0.5mm away from card edge
+    LENGTH_MM: 2,                       // <-- each crop mark is 2mm long
+    STROKE_PX: 1.2,                     // stroke width in canvas pixels
+    COLOR: '#00ff00'                    // crop mark color
+  },
+  BACK_IMAGE_URL: 'https://i.imgur.com/LdOBU1I.jpeg', // <-- backs image
+  CANVAS_PX: { W: 794, H: 1123 }        // ~96 DPI mapping for A4
+};
+// ------------------------------------------------------------
+
 let cachedImages = [];
 let cachedDeckName = "Deck";
 
@@ -110,10 +127,11 @@ async function loadDeck() {
 
 /**
  * Print view with options:
- * - addSpaceBetween (checkbox #spaceBetweenToggle): adds 10mm gaps between cards (cards remain 63x88mm).
- * - addBackground (checkbox #showBackgroundToggle): inserts a matching "backs" page after each fronts page,
- *   using https://i.imgur.com/LdOBU1I.jpeg. Layout & cutlines are identical so duplex prints align.
- * - Cutlines: per-card corner crop marks: two outgoing lines (H+V) of 3mm, starting 1mm away from each corner.
+ * - spaceBetweenToggle: adds GAP_WHEN_ENABLED_MM gaps between cards (cards remain 63x88mm).
+ * - showBackgroundToggle: inserts a matching "backs" page after each fronts page,
+ *   using CONFIG.BACK_IMAGE_URL. Layout & cutlines are identical so duplex prints align.
+ * - Cutlines: per-card corner crop marks — two outgoing lines (H+V) of LENGTH_MM,
+ *   starting OFFSET_FROM_EDGE_MM away from each corner.
  */
 function openPrintView() {
   if (!cachedImages.length) return;
@@ -124,17 +142,17 @@ function openPrintView() {
   const addBackground = document.getElementById('showBackgroundToggle')?.checked;
 
   // --- Physical constants (mm) ---
-  const PAGE_W = 210;              // A4 width (mm)
-  const PAGE_H = 297;              // A4 height (mm)
-  const CARD_W = 63;               // card width (mm)
-  const CARD_H = 88;               // card height (mm)
-  const GAP = addSpaceBetween ? 10 : 0; // gap between cards (mm)
+  const PAGE_W = CONFIG.PAGE_MM.W;
+  const PAGE_H = CONFIG.PAGE_MM.H;
+  const CARD_W = CONFIG.CARD_MM.W;
+  const CARD_H = CONFIG.CARD_MM.H;
+  const GAP = addSpaceBetween ? CONFIG.GAP_WHEN_ENABLED_MM : 0;
 
   // Derived sheet dimensions (3x3 grid)
-  const SHEET_W = 3 * CARD_W + 2 * GAP; // 63*3 + 2*GAP
-  const SHEET_H = 3 * CARD_H + 2 * GAP; // 88*3 + 2*GAP
+  const SHEET_W = CONFIG.GRID.COLS * CARD_W + (CONFIG.GRID.COLS - 1) * GAP;
+  const SHEET_H = CONFIG.GRID.ROWS * CARD_H + (CONFIG.GRID.ROWS - 1) * GAP;
 
-  // Center the sheet so it always fits on A4 (keeps A4 format, preserves card size)
+  // Center the sheet on A4 so everything fits while preserving card size
   const MARGIN_L = Math.max(0, (PAGE_W - SHEET_W) / 2);
   const MARGIN_T = Math.max(0, (PAGE_H - SHEET_H) / 2);
 
@@ -142,20 +160,16 @@ function openPrintView() {
   const titleBits = [
     deckName,
     showCutlines ? '(cutlines)' : '(no cutlines)',
-    addSpaceBetween ? '(10mm gaps)' : '(tight)',
+    addSpaceBetween ? `(${GAP}mm gaps)` : '(tight)',
     addBackground ? '(with backs)' : ''
   ].filter(Boolean);
   const title = titleBits.join(' ');
 
   const win = window.open('', '_blank');
 
-  // Use the provided absolute URL so the image is present in the new window's source
-  const backgroundAbsUrl = 'https://i.imgur.com/LdOBU1I.jpeg';
-
   // Helper to build one "front" page (or "back" page if isBack=true)
   function buildPageHTML(imgSrcs, isBack = false) {
-    // for back pages use the BACKGROUND image for all card slots being used on this page
-    const imgs = isBack ? new Array(imgSrcs.length).fill(backgroundAbsUrl) : imgSrcs;
+    const imgs = isBack ? new Array(imgSrcs.length).fill(CONFIG.BACK_IMAGE_URL) : imgSrcs;
     const imagesHTML = imgs.map(src => `<img src="${src}" alt="${isBack ? 'Card back' : 'Card front'}" />`).join('');
 
     return `
@@ -165,13 +179,13 @@ function openPrintView() {
           left:${MARGIN_L}mm;
           width:${SHEET_W}mm;
           height:${SHEET_H}mm;
-          grid-template-columns: repeat(3, ${CARD_W}mm);
-          grid-template-rows: repeat(3, ${CARD_H}mm);
+          grid-template-columns: repeat(${CONFIG.GRID.COLS}, ${CARD_W}mm);
+          grid-template-rows: repeat(${CONFIG.GRID.ROWS}, ${CARD_H}mm);
           gap:${GAP}mm;">
           ${imagesHTML}
         </div>
         <div class="cutlines" style="display:${showCutlines ? 'block' : 'none'};">
-          <canvas width="794" height="1123"></canvas>
+          <canvas width="${CONFIG.CANVAS_PX.W}" height="${CONFIG.CANVAS_PX.H}"></canvas>
         </div>
       </div>
     `;
@@ -179,14 +193,10 @@ function openPrintView() {
 
   // Build all pages (fronts, then optional matching backs)
   const pages = [];
-  for (let i = 0; i < cards.length; i += 9) {
-    const chunk = cards.slice(i, i + 9);
-    // Fronts
-    pages.push(buildPageHTML(chunk, false));
-    // Backs (exact same geometry so duplex aligns)
-    if (addBackground) {
-      pages.push(buildPageHTML(chunk, true));
-    }
+  for (let i = 0; i < cards.length; i += (CONFIG.GRID.COLS * CONFIG.GRID.ROWS)) {
+    const chunk = cards.slice(i, i + (CONFIG.GRID.COLS * CONFIG.GRID.ROWS));
+    pages.push(buildPageHTML(chunk, false));       // Fronts
+    if (addBackground) pages.push(buildPageHTML(chunk, true)); // Backs
   }
 
   const html = `
@@ -226,10 +236,11 @@ function openPrintView() {
       <script>
         document.title = ${JSON.stringify(title)};
 
-        // Draw corner crop marks for EVERY card:
-        // two outgoing lines of 3mm starting 1mm away from each corner (one horizontal + one vertical).
-        const OFFSET_MM = 1;  // gap between card edge and start of line
-        const LENGTH_MM = 3;  // length of each crop mark line
+        // Corner crop marks (two lines per corner) constants
+        const OFFSET_MM = ${CONFIG.CUTLINE.OFFSET_FROM_EDGE_MM};
+        const LENGTH_MM = ${CONFIG.CUTLINE.LENGTH_MM};
+        const STROKE_PX = ${CONFIG.CUTLINE.STROKE_PX};
+        const COLOR = ${JSON.stringify(CONFIG.CUTLINE.COLOR)};
 
         function drawCornerMarks(ctx, x, y, w, h, pxPerMM_X, pxPerMM_Y) {
           const offX = OFFSET_MM * pxPerMM_X;
@@ -237,42 +248,37 @@ function openPrintView() {
           const lenX = LENGTH_MM * pxPerMM_X;
           const lenY = LENGTH_MM * pxPerMM_Y;
 
+          ctx.strokeStyle = COLOR;
+          ctx.lineWidth = STROKE_PX;
+
           // TOP-LEFT
           ctx.beginPath();
-          // horizontal to the left
-          ctx.moveTo(x - offX - lenX, y);
+          ctx.moveTo(x - offX - lenX, y);        // horizontal outward
           ctx.lineTo(x - offX, y);
-          // vertical up
-          ctx.moveTo(x, y - offY - lenY);
+          ctx.moveTo(x, y - offY - lenY);        // vertical outward
           ctx.lineTo(x, y - offY);
           ctx.stroke();
 
           // TOP-RIGHT
           ctx.beginPath();
-          // horizontal to the right
           ctx.moveTo(x + w + offX, y);
           ctx.lineTo(x + w + offX + lenX, y);
-          // vertical up
           ctx.moveTo(x + w, y - offY - lenY);
           ctx.lineTo(x + w, y - offY);
           ctx.stroke();
 
           // BOTTOM-LEFT
           ctx.beginPath();
-          // horizontal to the left
           ctx.moveTo(x - offX - lenX, y + h);
           ctx.lineTo(x - offX, y + h);
-          // vertical down
           ctx.moveTo(x, y + h + offY);
           ctx.lineTo(x, y + h + offY + lenY);
           ctx.stroke();
 
           // BOTTOM-RIGHT
           ctx.beginPath();
-          // horizontal to the right
           ctx.moveTo(x + w + offX, y + h);
           ctx.lineTo(x + w + offX + lenX, y + h);
-          // vertical down
           ctx.moveTo(x + w, y + h + offY);
           ctx.lineTo(x + w, y + h + offY + lenY);
           ctx.stroke();
@@ -291,12 +297,9 @@ function openPrintView() {
           const gapX = ${GAP} * pxPerMM_X;
           const gapY = ${GAP} * pxPerMM_Y;
 
-          ctx.strokeStyle = '#00ff00';
-          ctx.lineWidth = 1.2;
-
-          // Loop 3x3 grid and draw corner marks for each cell
-          for (let row = 0; row < 3; row++) {
-            for (let col = 0; col < 3; col++) {
+          // Loop grid and draw corner marks for each card
+          for (let row = 0; row < ${CONFIG.GRID.ROWS}; row++) {
+            for (let col = 0; col < ${CONFIG.GRID.COLS}; col++) {
               const x = left + col * (cardW + gapX);
               const y = top + row * (cardH + gapY);
               drawCornerMarks(ctx, x, y, cardW, cardH, pxPerMM_X, pxPerMM_Y);
@@ -304,7 +307,7 @@ function openPrintView() {
           }
         });
 
-        // Wait for all images to load before printing (ensures backs/fronts are present)
+        // Wait for all images to load before printing (ensures backs/fronts present)
         function whenImagesLoaded() {
           const imgs = Array.from(document.images);
           const pending = imgs.filter(img => !img.complete || img.naturalWidth === 0);
