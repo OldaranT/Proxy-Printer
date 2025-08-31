@@ -1,189 +1,204 @@
-/* --- Palette: keep exact colors --- */
+/* style.css — Eris Proxies theme */
+
+/* ================= Theme Vars ================= */
 :root{
-  --bg:#0e1b10;
-  --text:#f8fff8;
-  --accent:#aaffaa;
-  --panel:#1d2b1d;
-  --line:#333;
-  --button:#2f4f2f;
-  --muted:#444;
-  --hover:#666;
-  --ring:#00cc00;
+  /* brand greens */
+  --forest-900:#0a281c;
+  --forest-800:#0d3123;
+  --forest-700:#0f3d2e;     /* anchor */
+  --forest-600:#146045;
+  --forest-500:#1a7a52;     /* primary */
+  --forest-400:#21a06a;     /* accent */
+
+  /* neutrals */
+  --ink:#0f1b14;
+  --text:#ffffff;
+  --text-dark:#0f1b14;
+
+  /* ui */
+  --mint-200:#cfeee0;       /* focus ring */
+  --mint-100:#e9f6f0;
+  --stone-200:#e7eee9;
+  --stone-300:#c8d6cf;
+
+  /* radii (less rounded than before) */
+  --radius-sm:8px;
+  --radius-md:10px;
+  --radius-lg:12px;
+
+  /* shadows */
+  --shadow-strong:0 8px 24px rgba(0,0,0,.18);
+  --shadow-soft:0 3px 10px rgba(0,0,0,.12);
+  --glow-on:0 0 0 6px rgba(33,160,106,.22);
 }
 
-*{box-sizing:border-box}
-
-body {
-  margin: 0;
-  font-family: 'Segoe UI', sans-serif;
-  background-color: var(--bg);
-  color: var(--text);
+/* ================= Page Background ================= */
+body{
+  margin:0;
+  font-family: system-ui,-apple-system,Segoe UI,Roboto,Inter,Ubuntu,'Helvetica Neue',Arial,sans-serif;
+  color:var(--ink);
+  /* layered, light, forest-tinted background */
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(33,160,106,.14), rgba(33,160,106,0) 60%),
+    radial-gradient(800px 400px at -10% 110%, rgba(15,61,46,.12), rgba(15,61,46,0) 55%),
+    linear-gradient(180deg,#f9fcfa 0%,#f0f7f3 60%,#eef6f1 100%);
 }
 
-.container {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 40px 20px;
-  text-align: center;
+/* ================= Container & Brand ================= */
+.container{max-width:980px;margin:36px auto 40px;padding:0 16px;}
+.brand{margin-bottom:16px}
+.brand-title{
+  margin:0;
+  font-size:36px;
+  line-height:1.1;
+  letter-spacing:.3px;
+  /* subtle gradient title */
+  background:linear-gradient(90deg,var(--forest-700),var(--forest-400));
+  -webkit-background-clip:text;background-clip:text;
+  color:transparent;
+  text-shadow:0 1px 0 rgba(255,255,255,.35);
+}
+.brand-sub{
+  margin:6px 0 0;
+  color:#345348;
+  font-weight:600;
+  letter-spacing:.2px;
 }
 
-h1 { color: var(--accent); margin-top: 0; }
-
-.input-group {
-  display: grid;
-  gap: 10px;
-  margin-bottom: 24px;
-  justify-items: center;
+/* ================= Inputs & Buttons ================= */
+.input-group{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px}
+.input-group input{
+  flex:1 1 360px;
+  height:44px;
+  padding:0 14px;
+  border:1px solid #dfe7e3;
+  border-radius:var(--radius-md);
+  font-size:14px;
+  outline:none;
+  background:#fff;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
 }
-
-input[type="text"] {
-  padding: 10px 12px;
-  width: 100%;
-  max-width: 640px;
-  border-radius: 6px;
-  border: 1px solid var(--line);
-  background-color: var(--panel);
-  color: #fff;
+.input-group .actions{display:flex;gap:8px}
+.btn{
+  height:44px; padding:0 14px; border-radius:var(--radius-md);
+  border:0; cursor:pointer;
+  background:linear-gradient(180deg,var(--forest-600),var(--forest-700));
+  color:#fff; font-weight:700; letter-spacing:.2px;
+  box-shadow: var(--shadow-soft);
+  transition: transform .12s ease, box-shadow .2s ease, background .2s ease;
 }
-
-.actions{
-  display: grid;
-  grid-auto-flow: column;
-  gap: 8px;
+.btn.sm{height:40px}
+.btn:hover:not(:disabled){
+  transform: translateY(-1px);
+  background:linear-gradient(180deg,var(--forest-500),var(--forest-600));
+  box-shadow: var(--shadow-strong);
 }
+.btn:active{transform: translateY(0)}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+.btn:focus-visible{outline:3px solid var(--mint-200); outline-offset:2px}
 
-.btn {
-  padding: 10px 16px;
-  background-color: var(--button);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: transform .05s ease, opacity .2s ease;
-}
-.btn.sm{ padding: 8px 12px; }
-.btn:hover { transform: translateY(-1px); }
-.btn:disabled { background-color: #444; cursor: not-allowed; transform: none; }
-
-/* --- Toggles (checkbox sliders) --- */
+/* ================= Toggles ================= */
 .toggles{
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 10px;
-  margin: 6px auto 28px;
-  max-width: 960px;
+  display:flex; flex-wrap:wrap; gap:12px 16px; align-items:stretch;
+  margin:18px 0 8px;
 }
+
+/* Toggle block — less rounded than pills */
 .toggle{
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  display:flex; align-items:center; gap:12px;
+  padding:10px 12px;
+  border-radius:var(--radius-lg);
+  color:#fff;
+  background: linear-gradient(180deg, var(--forest-700), var(--forest-800));
+  border:1px solid rgba(255,255,255,.06);
+  box-shadow: var(--shadow-soft), inset 0 0 0 1px rgba(255,255,255,.06);
+  transition: transform .15s ease, box-shadow .2s ease, background .2s ease, border-color .2s ease;
 }
-.state{
-  font-size: 12.5px;
-  line-height: 1;
-  white-space: nowrap;
-  opacity: .55;
+.toggle:hover{
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-strong), inset 0 0 0 1px rgba(255,255,255,.08);
 }
+.toggle .state{
+  font-size:13.5px; font-weight:800; letter-spacing:.2px;
+  color:#fff;
+  user-select:none;
+  transition: opacity .2s ease;
+}
+.toggle .state-on{opacity:.55}
+.toggle .state-off{opacity:1}
+.toggle:has(input:checked){
+  background: linear-gradient(180deg, var(--forest-500), var(--forest-700));
+  border-color: rgba(255,255,255,.1);
+  box-shadow: var(--shadow-strong), var(--glow-on), inset 0 0 0 1px rgba(255,255,255,.08);
+}
+.toggle:has(input:checked) .state-on{opacity:1}
+.toggle:has(input:checked) .state-off{opacity:.45}
+@supports not(selector(:has(*))){
+  .toggle .state-on, .toggle .state-off{opacity:1}
+}
+
+/* Switch (track & thumb) — toned down roundness */
 .switch{
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
+  position:relative; display:inline-block; width:66px; height:36px; flex:0 0 auto;
 }
 .switch input{
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
+  position:absolute; inset:0; margin:0; opacity:0; cursor:pointer;
 }
-.track{
-  width: 56px;
-  height: 28px;
-  background: var(--muted);
-  border-radius: 999px;
-  position: relative;
-  transition: background-color .2s ease;
-  border: 1px solid var(--line);
+.switch .track{
+  position:absolute; inset:0;
+  border-radius:14px; /* was 9999px; now subtler */
+  background: #eef5f1;
+  border:1px solid #d6e3dc;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.10);
+  transition: background .2s ease, border-color .2s ease, box-shadow .2s ease;
 }
-.thumb{
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #0b150c;
-  box-shadow: 0 0 0 2px #0b150c, 0 0 8px #111;
-  transition: left .2s ease;
+.switch .thumb{
+  position:absolute; top:50%; left:6px;
+  width:26px; height:26px; border-radius:10px; /* less round */
+  background:#fff;
+  transform: translateY(-50%);
+  box-shadow: 0 3px 10px rgba(0,0,0,.25);
+  transition: left .22s cubic-bezier(.2,.8,.2,1), box-shadow .22s ease, transform .12s ease;
 }
-
-/* Checked state visuals (no JS needed) */
-.switch input:checked + .track{ background: var(--button); }
-.switch input:checked + .track .thumb{ left: 32px; }
-
-/* Dim/brighten the side labels based on checked */
-.toggle .state-off{ text-align: right; }
-.toggle .state-on{ text-align: left; }
-.toggle .switch input:not(:checked) ~ .state-on,
-.toggle .switch input:checked ~ .state-off{ opacity: .35; }
-
-/* Make that sibling relation work:
-   reflow DOM inside .toggle to allow label shading via CSS only */
-.toggle{
-  position: relative;
+.switch:hover .thumb{ transform: translateY(-50%) scale(1.04) }
+.switch input:focus-visible + .track{ outline:3px solid var(--mint-200); outline-offset:2px }
+.switch input:checked + .track{
+  background: linear-gradient(180deg, var(--forest-400), var(--forest-500));
+  border-color: #16764e;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,.15);
 }
-.toggle > .switch{ order: 2; }
-.toggle > .state-on{ order: 3; }
-.toggle > .state-off{ order: 1; }
-
-/* Card grid (unchanged behavior) */
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 15px;
-  justify-content: center;
-}
-.card img {
-  width: 100%;
-  border-radius: 5px;
-  box-shadow: 0 0 10px #111;
+.switch input:checked + .track .thumb{
+  left: calc(100% - 6px - 26px);
+  box-shadow: 0 0 0 6px rgba(33,160,106,.18), 0 3px 10px rgba(0,0,0,.28);
 }
 
-/* Spinner (keep exactly same look & motion) */
-.hidden { display: none; }
-.spinner-wrapper {
-  position: relative;
-  width: 80px;
-  height: 80px;
-  margin: 30px auto;
+/* ================= Loading ================= */
+#loading.hidden{ display:none }
+#loading{
+  position:fixed; inset:0; backdrop-filter:saturate(120%) blur(1.5px);
+  background: rgba(255,255,255,.6);
+  display:flex; align-items:center; justify-content:center; z-index:9999;
 }
-.spinner-ring {
-  position: absolute;
-  width: 80px;
-  height: 80px;
-  border: 4px solid transparent;
-  border-top: 4px solid var(--ring);
-  border-radius: 50%;
-  animation: rotate 1s linear infinite;
+.spinner-wrapper{ position:relative; width:92px; height:92px; }
+.spinner-ring{
+  position:absolute; inset:0; border-radius:50%;
+  border:6px solid #e6efe9; border-top-color: var(--forest-500);
+  animation: spin 1s linear infinite;
 }
-.spinner-icon {
-  position: absolute;
-  top: 22px;
-  left: 22px;
-  width: 36px;
-  height: 36px;
-  object-fit: contain;
-  z-index: 10;
+.spinner-icon{
+  position:absolute; width:46px; height:46px; object-fit:contain;
+  left:50%; top:50%; transform:translate(-50%,-50%);
 }
-@keyframes rotate {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+@keyframes spin{ to{ transform: rotate(360deg) } }
+
+/* ================= Card grid preview ================= */
+.card-grid{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+  gap:12px; margin-top:14px;
 }
+.card-grid .card{
+  aspect-ratio:63/88;
+  background:#f4f7f5; border:1px solid #e7eee9; border-radius:var(--radius-lg);
+  overflow:hidden; box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+.card-grid .card img{ width:100%; height:100%; object-fit:cover; display:block; }
