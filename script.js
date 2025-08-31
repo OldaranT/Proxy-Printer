@@ -2,12 +2,16 @@
 
 // ---------- Tweakable constants ----------
 const CONFIG = {
-  // Supported page sizes (portrait, in mm)
+  // Supported page sizes (portrait dimensions, in mm)
   PAGE_SIZES_MM: {
     A4: { W: 210, H: 297 },
     A3: { W: 297, H: 420 }
   },
-  DEFAULT_PAGE: 'A4',              // starting size if your toggle is unchecked
+  DEFAULT_PAGE: 'A4',              // used when pageSize toggle is OFF
+
+  // Auto orientation picks portrait/landscape to maximize #cards per page.
+  // Options: 'auto' | 'portrait' | 'landscape'
+  ORIENTATION_MODE: 'auto',
 
   // Card geometry (mm)
   CARD_MM: { W: 63, H: 88 },
@@ -17,8 +21,8 @@ const CONFIG = {
 
   // Cutline (corner crop marks) styling
   CUTLINE: {
-    OFFSET_FROM_EDGE_MM: 0.5,      // space from card edge to start of each crop mark
-    LENGTH_MM: 2,                  // length of each crop mark line
+    OFFSET_FROM_EDGE_MM: 0.5,      // 0.5mm from card edge to start of each crop mark
+    LENGTH_MM: 2,                  // each crop mark line is 2mm long
     STROKE_PX: 1.2,                // stroke width (canvas pixels)
     COLOR: '#00ff00'               // crop mark color
   },
@@ -44,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const showBackgroundToggleWrapper = document.getElementById('showBackgroundToggleWrapper');
   const showBackgroundToggleCheckbox = document.getElementById('showBackgroundToggle');
 
+  // NEW: Page size toggle (A4 <-> A3). When checked => A3, unchecked => A4
   const pageSizeToggleWrapper = document.getElementById('pageSizeToggleWrapper');
   const pageSizeToggleCheckbox = document.getElementById('pageSizeToggle');
 
@@ -87,7 +92,6 @@ document.addEventListener('DOMContentLoaded', () => {
     showBackgroundToggleWrapper.classList.toggle('active', showBackgroundToggleCheckbox.checked);
   }
   if (pageSizeToggleWrapper && pageSizeToggleCheckbox) {
-    // If you want A3 by default, set the checkbox default in HTML or flip this line
     pageSizeToggleWrapper.classList.toggle('active', pageSizeToggleCheckbox.checked);
   }
 });
@@ -166,11 +170,34 @@ function computeGridDims(pageWmm, pageHmm, cardWmm, cardHmm, gapmm) {
 }
 
 /**
+ * Given a size key (A4/A3) and current gap, pick portrait or landscape
+ * to maximize capacity (unless ORIENTATION_MODE forces one).
+ */
+function choosePageGeometry(sizeKey, gapmm) {
+  const base = CONFIG.PAGE_SIZES_MM[sizeKey]; // portrait dims
+  let portrait = { W: base.W, H: base.H, orient: 'portrait' };
+  let landscape = { W: base.H, H: base.W, orient: 'landscape' };
+
+  // Respect forced orientation
+  if (CONFIG.ORIENTATION_MODE === 'portrait') return portrait;
+  if (CONFIG.ORIENTATION_MODE === 'landscape') return landscape;
+
+  // Auto: compute capacity both ways and pick the larger
+  const a = computeGridDims(portrait.W, portrait.H, CONFIG.CARD_MM.W, CONFIG.CARD_MM.H, gapmm);
+  const b = computeGridDims(landscape.W, landscape.H, CONFIG.CARD_MM.W, CONFIG.CARD_MM.H, gapmm);
+  const capA = a.cols * a.rows;
+  const capB = b.cols * b.rows;
+
+  return capB > capA ? landscape : portrait; // tie -> portrait
+}
+
+/**
  * Print view with options:
  * - spaceBetweenToggle: adds GAP_WHEN_ENABLED_MM gaps between cards (cards remain 63x88mm).
  * - showBackgroundToggle: inserts a matching "backs" page after each fronts page (duplex aligned).
- * - cutlineToggle: corner crop marks per card (two lines, 2mm long, starting 0.5mm from each corner).
+ * - cutlineToggle: per-card corner crop marks (2mm lines, start 0.5mm from edges).
  * - pageSizeToggle: toggles between A4 (unchecked) and A3 (checked).
+ * - Auto orientation: chooses portrait/landscape to fit the MOST cards per page (=> A3 lands at 18).
  */
 function openPrintView() {
   if (!cachedImages.length) return;
@@ -182,33 +209,39 @@ function openPrintView() {
 
   // Page size toggle: unchecked => A4, checked => A3
   const useA3 = document.getElementById('pageSizeToggle')?.checked || false;
-  const sizeKey = useA3 ? 'A3' : CONFIG.DEFAULT_PAGE; // DEFAULT_PAGE is 'A4' unless you change it
-  const PAGE_W = CONFIG.PAGE_SIZES_MM[sizeKey].W;
-  const PAGE_H = CONFIG.PAGE_SIZES_MM[sizeKey].H;
+  const sizeKey = useA3 ? 'A3' : CONFIG.DEFAULT_PAGE;
 
-  // Geometry (mm)
   const CARD_W = CONFIG.CARD_MM.W;
   const CARD_H = CONFIG.CARD_MM.H;
   const GAP = addSpaceBetween ? CONFIG.GAP_WHEN_ENABLED_MM : 0;
 
-  // Compute grid (dynamic: more cards on A3)
+  // Decide orientation + working page dims
+  const chosen = choosePageGeometry(sizeKey, GAP);
+  const PAGE_W = chosen.W;
+  const PAGE_H = chosen.H;
+  const ORIENT = chosen.orient;
+
+  // Compute grid (dynamic)
   const { cols: GRID_COLS, rows: GRID_ROWS } = computeGridDims(PAGE_W, PAGE_H, CARD_W, CARD_H, GAP);
 
-  // Derived sheet dimensions (centered on page)
+  // Derived sheet dimensions and centered margins
   const SHEET_W = GRID_COLS * CARD_W + (GRID_COLS - 1) * GAP;
   const SHEET_H = GRID_ROWS * CARD_H + (GRID_ROWS - 1) * GAP;
   const MARGIN_L = Math.max(0, (PAGE_W - SHEET_W) / 2);
   const MARGIN_T = Math.max(0, (PAGE_H - SHEET_H) / 2);
 
-  // Canvas size in pixels based on physical page dimensions
+  // Canvas sizing from physical page size
   const MM_PER_IN = 25.4;
   const CANVAS_W_PX = Math.round((PAGE_W / MM_PER_IN) * CONFIG.CANVAS_DPI);
   const CANVAS_H_PX = Math.round((PAGE_H / MM_PER_IN) * CONFIG.CANVAS_DPI);
 
   const cards = cachedImages.flatMap(card => Array(card.quantity).fill(card.img));
+  const perPage = GRID_COLS * GRID_ROWS;
+
   const titleBits = [
     deckName,
-    sizeKey,
+    `${sizeKey} ${ORIENT}`,
+    `${perPage}/page`,
     showCutlines ? '(cutlines)' : '(no cutlines)',
     addSpaceBetween ? `(${GAP}mm gaps)` : '(tight)',
     addBackground ? '(with backs)' : ''
@@ -217,7 +250,6 @@ function openPrintView() {
 
   const win = window.open('', '_blank');
 
-  // Build one page's HTML (front or back). Back uses the same geometry.
   function buildPageHTML(imgSrcs, isBack = false) {
     const imgs = isBack ? new Array(imgSrcs.length).fill(CONFIG.BACK_IMAGE_URL) : imgSrcs;
     const imagesHTML = imgs.map(src => `<img src="${src}" alt="${isBack ? 'Card back' : 'Card front'}" />`).join('');
@@ -243,9 +275,8 @@ function openPrintView() {
 
   // Build all pages (fronts + optional backs)
   const pages = [];
-  const pageCapacity = GRID_COLS * GRID_ROWS;
-  for (let i = 0; i < cards.length; i += pageCapacity) {
-    const chunk = cards.slice(i, i + pageCapacity);
+  for (let i = 0; i < cards.length; i += perPage) {
+    const chunk = cards.slice(i, i + perPage);
     pages.push(buildPageHTML(chunk, false));        // Fronts
     if (addBackground) pages.push(buildPageHTML(chunk, true)); // Backs
   }
@@ -343,18 +374,17 @@ function openPrintView() {
           ctx.stroke();
         }
 
-        // Draw for each page
+        // Draw for each page (uses the sheet's inline top/left in mm for exact alignment)
         document.querySelectorAll('.cutlines canvas').forEach(canvas => {
           const ctx = canvas.getContext('2d');
           const pxPerMM_X = canvas.width / PAGE_W;
           const pxPerMM_Y = canvas.height / PAGE_H;
 
-          // Read sheet position from inline style to stay exact
           const sheet = canvas.parentElement.previousElementSibling;
           const style = sheet.style;
 
           const leftMM = parseFloat(style.left);
-          const topMM = parseFloat(style.top);
+          const topMM  = parseFloat(style.top);
 
           const left = leftMM * pxPerMM_X;
           const top  = topMM  * pxPerMM_Y;
@@ -364,7 +394,6 @@ function openPrintView() {
           const gapX  = GAP * pxPerMM_X;
           const gapY  = GAP * pxPerMM_Y;
 
-          // Loop grid and draw corner marks for each card
           for (let row = 0; row < GRID_ROWS; row++) {
             for (let col = 0; col < GRID_COLS; col++) {
               const x = left + col * (cardW + gapX);
