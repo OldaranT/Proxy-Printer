@@ -2,46 +2,42 @@
 
 // ---------- Tweakable constants ----------
 const CONFIG = {
-  // Supported page sizes (portrait dimensions, in mm)
   PAGE_SIZES_MM: {
     A4: { W: 210, H: 297 },
     A3: { W: 297, H: 420 }
   },
-  DEFAULT_PAGE: 'A4',              // used when pageSize toggle is OFF
-
-  // Auto orientation picks portrait/landscape to maximize #cards per page.
-  // Options: 'auto' | 'portrait' | 'landscape'
+  DEFAULT_PAGE: 'A4',
   ORIENTATION_MODE: 'auto',
 
-  // Card geometry (mm)
   CARD_MM: { W: 63, H: 88 },
 
-  // Spacing
-  GAP_WHEN_ENABLED_MM: 6,          // space between cards when "spaceBetween" toggle is ON
+  GAP_WHEN_ENABLED_MM: 6,
 
-  // Cutline (corner crop marks) styling
   CUTLINE: {
-    OFFSET_FROM_EDGE_MM: 0.5,      // 0.5mm from card edge to start of each crop mark
-    LENGTH_MM: 2,                  // each crop mark line is 2mm long
-    STROKE_PX: 1.2,                // stroke width (canvas pixels)
-    COLOR: '#00ff00'               // crop mark color
+    OFFSET_FROM_EDGE_MM: 0.5,
+    LENGTH_MM: 2,
+    STROKE_PX: 1.2,
+    COLOR: '#00ff00'
   },
 
-  // Back image for duplex printing (UPDATED)
+  // UPDATED back image source
   BACK_IMAGE_URL: 'https://cdn.imgchest.com/files/7kzcajvdwp7.png',
 
-  // Canvas pixel density (used to size the canvases to the physical page)
-  CANVAS_DPI: 96                   // px per inch for the canvas drawing of cutlines & bg panel
+  CANVAS_DPI: 96,
+
+  // Category label printing on front pages
+  PRINT_CATEGORY_LABELS: true
 };
 // ----------------------------------------
 
 let cachedImages = [];
 let cachedDeckName = "Deck";
+let categoryOrderFromServer = []; // optional hint from server
 
-// Slider-style checkboxes (CSS-only): cutLinesToggle, spaceBetweenToggle, backSideToggle, blackBackgroundToggle, pageSizeToggle
 document.addEventListener('DOMContentLoaded', () => {
   ensureTotalsBar();
-  // Fallback for browsers without :has()
+
+  // Fallback for :has() in CSS
   const supportsHas = CSS.supports?.('selector(:has(*))');
   if (!supportsHas) {
     document.querySelectorAll('.toggle').forEach(toggle => {
@@ -76,7 +72,6 @@ function ensureTotalsBar() {
 }
 
 function getTotals() {
-  const unique = cachedImages.length;
   let total = 0;
   let zeroed = 0;
   for (const c of cachedImages) {
@@ -84,7 +79,7 @@ function getTotals() {
     if (q === 0) zeroed++;
     total += q;
   }
-  return { unique, total, zeroed };
+  return { total, zeroed };
 }
 
 function updateTotalsBar() {
@@ -95,7 +90,7 @@ function updateTotalsBar() {
   if (zeroEl) zeroEl.textContent = String(zeroed);
 }
 
-// =============== Helpers for quantity ===============
+// =============== Helpers ===============
 function clampQty(n) {
   n = Number.isFinite(+n) ? +n : 0;
   return Math.max(0, Math.floor(n));
@@ -110,19 +105,14 @@ function setCardQuantity(index, qty) {
   const newQty = clampQty(qty);
   cachedImages[index].quantity = newQty;
 
-  // Update tile badge + a11y label + 0-state class live
   const tile = document.querySelector(`.card[data-index="${index}"]`);
   if (tile) {
     const badge = tile.querySelector('.qty-badge');
     if (badge) badge.textContent = `×${newQty}`;
-
     const name = cachedImages[index].name ?? 'Card';
     tile.setAttribute('aria-label', `${name} – quantity ${newQty}`);
-
     applyZeroStateClass(tile, newQty);
   }
-
-  // Refresh totals
   updateTotalsBar();
 }
 
@@ -130,12 +120,95 @@ function extractDeckUrl(url) {
   return url.trim();
 }
 
+// Group cards by category. Uses server-provided order if available, else first-seen order.
+function groupByCategory(cards) {
+  const groups = new Map();
+  const order = [];
+
+  cards.forEach(c => {
+    const cat = (c.category || 'Uncategorized').trim() || 'Uncategorized';
+    if (!groups.has(cat)) {
+      groups.set(cat, []);
+      order.push(cat);
+    }
+    groups.get(cat).push(c);
+  });
+
+  // If server sent categoryOrder, respect that order but keep unknowns at the end
+  if (Array.isArray(categoryOrderFromServer) && categoryOrderFromServer.length) {
+    const ordered = [];
+    const seen = new Set();
+    categoryOrderFromServer.forEach(cat => {
+      if (groups.has(cat)) {
+        ordered.push([cat, groups.get(cat)]);
+        seen.add(cat);
+      }
+    });
+    // append any categories not in the given order
+    order.forEach(cat => {
+      if (!seen.has(cat)) ordered.push([cat, groups.get(cat)]);
+    });
+    return ordered;
+  }
+
+  // Default: order of first appearance
+  return order.map(cat => [cat, groups.get(cat)]);
+}
+
+// Render overview: grouped sections with headings
+function renderOverviewGrid() {
+  const grid = document.getElementById('cardGrid');
+  grid.innerHTML = '';
+
+  const grouped = groupByCategory(cachedImages);
+
+  grouped.forEach(([category, cards]) => {
+    const section = document.createElement('section');
+    section.className = 'category-section';
+
+    const header = document.createElement('h2');
+    header.className = 'category-title';
+    header.textContent = category;
+    section.appendChild(header);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'category-grid';
+
+    cards.forEach(card => {
+      const i = card._idx; // original index
+      const tile = document.createElement('div');
+      tile.className = 'card';
+      tile.dataset.index = String(i);
+
+      const qty = clampQty(card.quantity ?? 1);
+      tile.setAttribute('aria-label', `${card.name} – quantity ${qty}`);
+
+      const img = document.createElement('img');
+      img.src = card.img;
+      img.alt = card.name ?? 'Card';
+
+      const badge = document.createElement('span');
+      badge.className = 'qty-badge';
+      badge.textContent = `×${qty}`;
+
+      applyZeroStateClass(tile, qty);
+      tile.addEventListener('click', () => openPreviewModal(i));
+
+      tile.appendChild(img);
+      tile.appendChild(badge);
+      wrap.appendChild(tile);
+    });
+
+    section.appendChild(wrap);
+    grid.appendChild(section);
+  });
+}
+
 async function loadDeck() {
   const urlInput = document.getElementById('deckUrl');
   const button = document.getElementById('loadBtn');
   const printBtn = document.getElementById('printBtn');
   const loading = document.getElementById('loading');
-  const grid = document.getElementById('cardGrid');
 
   const deckUrl = extractDeckUrl(urlInput.value);
   if (!deckUrl || (!deckUrl.includes("archidekt.com") && !deckUrl.includes("moxfield.com"))) {
@@ -156,9 +229,10 @@ async function loadDeck() {
   button.disabled = true;
   printBtn.disabled = true;
   loading.classList.remove('hidden');
-  grid.innerHTML = '';
+  document.getElementById('cardGrid').innerHTML = '';
   cachedImages = [];
-  updateTotalsBar(); // reset totals display
+  categoryOrderFromServer = [];
+  updateTotalsBar();
 
   try {
     const res = await fetch(`https://mtg-proxy-api-server.onrender.com/api/deck?url=${encodeURIComponent(deckUrl)}`);
@@ -168,40 +242,17 @@ async function loadDeck() {
       throw new Error("No images returned.");
     }
 
-    // Normalize and build tiles
+    categoryOrderFromServer = Array.isArray(data.categoryOrder) ? data.categoryOrder : [];
+
     cachedImages = data.images.map((card, i) => ({
       ...card,
       quantity: clampQty(card.quantity ?? 1),
+      category: (card.category || 'Uncategorized').trim() || 'Uncategorized',
       _idx: i
     }));
 
-    cachedImages.forEach((card, i) => {
-      const div = document.createElement('div');
-      div.className = 'card';
-      div.dataset.index = String(i);
-
-      const qty = clampQty(card.quantity);
-      div.setAttribute('aria-label', `${card.name} – quantity ${qty}`);
-
-      const img = document.createElement('img');
-      img.src = card.img;
-      img.alt = card.name ?? 'Card';
-
-      // quantity badge (always shown; even ×0)
-      const badge = document.createElement('span');
-      badge.className = 'qty-badge';
-      badge.textContent = `×${qty}`;
-
-      // mark zero-state visually
-      applyZeroStateClass(div, qty);
-
-      // click to open preview modal
-      div.addEventListener('click', () => openPreviewModal(i));
-
-      div.appendChild(img);
-      div.appendChild(badge);
-      grid.appendChild(div);
-    });
+    renderOverviewGrid();
+    updateTotalsBar();
 
     printBtn.disabled = false;
   } catch (err) {
@@ -212,26 +263,17 @@ async function loadDeck() {
   loading.classList.add('hidden');
   urlInput.disabled = false;
   button.disabled = false;
-
-  // Update totals after rendering
-  updateTotalsBar();
 }
 
-/**
- * Compute max grid that fits on a page given physical dimensions and gap.
- * Returns { cols, rows } with minimum of 1 each.
- */
+// ========= Print helpers =========
 function computeGridDims(pageWmm, pageHmm, cardWmm, cardHmm, gapmm) {
   const cols = Math.max(1, Math.floor((pageWmm + gapmm) / (cardWmm + gapmm)));
   const rows = Math.max(1, Math.floor((pageHmm + gapmm) / (cardHmm + gapmm)));
   return { cols, rows };
 }
 
-/**
- * Choose portrait or landscape to maximize capacity (unless orientation is forced).
- */
 function choosePageGeometry(sizeKey, gapmm) {
-  const base = CONFIG.PAGE_SIZES_MM[sizeKey]; // portrait dims
+  const base = CONFIG.PAGE_SIZES_MM[sizeKey];
   let portrait = { W: base.W, H: base.H, orient: 'portrait' };
   let landscape = { W: base.H, H: base.W, orient: 'landscape' };
 
@@ -240,20 +282,11 @@ function choosePageGeometry(sizeKey, gapmm) {
 
   const a = computeGridDims(portrait.W, portrait.H, CONFIG.CARD_MM.W, CONFIG.CARD_MM.H, gapmm);
   const b = computeGridDims(landscape.W, landscape.H, CONFIG.CARD_MM.W, CONFIG.CARD_MM.H, gapmm);
-  return (b.cols * b.rows) > (a.cols * a.rows) ? landscape : portrait; // tie -> portrait
+  return (b.cols * b.rows) > (a.cols * a.rows) ? landscape : portrait;
 }
 
-/**
- * Print view with options:
- * - spaceBetweenToggle: adds GAP_WHEN_ENABLED_MM gaps between cards (cards remain 63x88mm).
- * - backSideToggle: inserts a matching "backs" page after each fronts page.
- *   Backs are ALWAYS full-page grids and perfectly centered.
- * - blackBackgroundToggle: draws a CANVAS at the lowest z-index (−5) so PDF includes it.
- * - cutLinesToggle: per-card corner crop marks (2mm lines, start 0.5mm from edges).
- * - pageSizeToggle: toggles between A4 (unchecked) and A3 (checked).
- * - Auto orientation: chooses portrait/landscape to fit the MOST cards per page.
- * - Cards with quantity 0 are excluded.
- */
+// Build all print pages, grouped by category.
+// For each category we fill pages with that category's cards (respecting quantities, excluding ×0).
 function openPrintView() {
   if (!cachedImages.length) return;
 
@@ -266,42 +299,33 @@ function openPrintView() {
 
   const sizeKey = useA3 ? 'A3' : CONFIG.DEFAULT_PAGE;
 
-  // Geometry (mm)
   const CARD_W = CONFIG.CARD_MM.W;
   const CARD_H = CONFIG.CARD_MM.H;
   const GAP = addSpaceBetween ? CONFIG.GAP_WHEN_ENABLED_MM : 0;
 
-  // Decide orientation + working page dims
   const chosen = choosePageGeometry(sizeKey, GAP);
   const PAGE_W = chosen.W;
   const PAGE_H = chosen.H;
   const ORIENT = chosen.orient;
 
-  // Compute grid (dynamic)
   const { cols: GRID_COLS, rows: GRID_ROWS } = computeGridDims(PAGE_W, PAGE_H, CARD_W, CARD_H, GAP);
 
-  // Derived sheet dimensions and centered margins (CENTER-BASED ALIGNMENT)
   const SHEET_W = GRID_COLS * CARD_W + (GRID_COLS - 1) * GAP;
   const SHEET_H = GRID_ROWS * CARD_H + (GRID_ROWS - 1) * GAP;
   const MARGIN_L = Math.max(0, (PAGE_W - SHEET_W) / 2);
   const MARGIN_T = Math.max(0, (PAGE_H - SHEET_H) / 2);
 
-  // Canvas sizing from physical page size
   const MM_PER_IN = 25.4;
   const CANVAS_W_PX = Math.round((PAGE_W / MM_PER_IN) * CONFIG.CANVAS_DPI);
   const CANVAS_H_PX = Math.round((PAGE_H / MM_PER_IN) * CONFIG.CANVAS_DPI);
 
-  // Respect quantity, exclude 0
-  const cards = cachedImages.flatMap(card => {
-    const q = clampQty(card.quantity);
-    return q > 0 ? new Array(q).fill(card.img) : [];
-  });
-  const perPage = GRID_COLS * GRID_ROWS;
+  // Build list grouped by category (respect server order when available)
+  const grouped = groupByCategory(cachedImages);
 
   const titleBits = [
     deckName,
     `${sizeKey} ${ORIENT}`,
-    `${perPage}/page`,
+    `${GRID_COLS * GRID_ROWS}/page`,
     showCutlines ? '(cutlines)' : '(no cutlines)',
     addSpaceBetween ? `(${GAP}mm gaps)` : '(tight)',
     addBackground ? '(with backs)' : '',
@@ -311,19 +335,24 @@ function openPrintView() {
 
   const win = window.open('', '_blank');
 
-  function buildPageHTML(imgSrcs, isBack = false) {
-    // FRONT: use actual chunk images (could be < perPage)
-    // BACK: always fill the entire page with background backs (exactly perPage)
+  function buildPageHTML(imgSrcs, opts) {
+    const { isBack, categoryName } = opts;
+    const perPage = GRID_COLS * GRID_ROWS;
+
     const imgs = isBack ? new Array(perPage).fill(CONFIG.BACK_IMAGE_URL) : imgSrcs;
     const imagesHTML = imgs.map(src => `<img src="${src}" alt="${isBack ? 'Card back' : 'Card front'}" />`).join('');
 
+    const categoryLabel = (CONFIG.PRINT_CATEGORY_LABELS && !isBack && categoryName)
+      ? `<div class="page-label">${escapeHTML(categoryName)}</div>`
+      : '';
+
     return `
       <div class="page ${isBack ? 'back' : 'front'}">
-        <!-- Lowest layer: CANVAS we fill (black/transparent), with z-index -5 inside a page stacking context -->
         <canvas class="page-fill" width="${CANVAS_W_PX}" height="${CANVAS_H_PX}"
           style="position:absolute; left:0; top:0; width:${PAGE_W}mm; height:${PAGE_H}mm; z-index:-5;"></canvas>
 
-        <!-- Centered sheet of cards -->
+        ${categoryLabel}
+
         <div class="sheet" style="
           position:absolute;
           top:${MARGIN_T}mm;
@@ -338,7 +367,6 @@ function openPrintView() {
           ${imagesHTML}
         </div>
 
-        <!-- Cutlines overlay -->
         <div class="cutlines" style="position:absolute; inset:0; z-index:20; pointer-events:none; display:${showCutlines ? 'block' : 'none'};">
           <canvas width="${CANVAS_W_PX}" height="${CANVAS_H_PX}"
             style="position:absolute; left:0; top:0; width:${PAGE_W}mm; height:${PAGE_H}mm;"></canvas>
@@ -347,13 +375,33 @@ function openPrintView() {
     `;
   }
 
-  // Build all pages (fronts + optional backs)
-  const pages = [];
-  for (let i = 0; i < cards.length; i += perPage) {
-    const chunk = cards.slice(i, i + perPage);
-    pages.push(buildPageHTML(chunk, false));        // Fronts
-    if (addBackground) pages.push(buildPageHTML(chunk, true)); // Backs
+  // Escape basic HTML
+  function escapeHTML(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    })[c]);
   }
+
+  // Build pages by category
+  const perPage = GRID_COLS * GRID_ROWS;
+  const pages = [];
+
+  grouped.forEach(([category, cards]) => {
+    // Build flat array of image src respecting quantity (>0 only)
+    const imgs = cards.flatMap(card => {
+      const q = clampQty(card.quantity);
+      return q > 0 ? new Array(q).fill(card.img) : [];
+    });
+    if (imgs.length === 0) return;
+
+    for (let i = 0; i < imgs.length; i += perPage) {
+      const chunk = imgs.slice(i, i + perPage);
+      // front page for this chunk with label
+      pages.push(buildPageHTML(chunk, { isBack: false, categoryName: category }));
+      // optional back page (no label)
+      if (addBackground) pages.push(buildPageHTML(chunk, { isBack: true, categoryName: category }));
+    }
+  });
 
   const html = `
   <html>
@@ -370,6 +418,7 @@ function openPrintView() {
           overflow: hidden;
           z-index: 0;
           isolation: isolate;
+          font-family: system-ui, Segoe UI, Roboto, Inter, Arial, sans-serif;
         }
         .sheet { position: absolute; }
         .sheet img {
@@ -378,6 +427,23 @@ function openPrintView() {
           object-fit: cover;
           display: block;
         }
+        /* Small category label at the very top (doesn't affect grid math) */
+        .page-label{
+          position:absolute;
+          top: 4mm;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 15;
+          padding: 2mm 4mm;
+          border: 0.2mm solid rgba(0,0,0,.25);
+          border-radius: 1.4mm;
+          background: #ffffff;
+          color: #0f3d2e;
+          font-weight: 800;
+          font-size: 3.2mm;
+          letter-spacing: .2mm;
+          box-shadow: 0 0.9mm 2.4mm rgba(0,0,0,.12);
+        }
       </style>
     </head>
     <body>
@@ -385,7 +451,6 @@ function openPrintView() {
       <script>
         document.title = ${JSON.stringify(title)};
 
-        // Injected geometry (shared by fronts/backs/cutlines)
         const USE_BLACK_BG = ${useBlackBg ? 'true' : 'false'};
         const OFFSET_MM = ${CONFIG.CUTLINE.OFFSET_FROM_EDGE_MM};
         const LENGTH_MM = ${CONFIG.CUTLINE.LENGTH_MM};
@@ -402,7 +467,6 @@ function openPrintView() {
         const MARGIN_L = ${MARGIN_L};
         const MARGIN_T = ${MARGIN_T};
 
-        // Fill the bottom page canvas (ensures background is part of PDF content)
         document.querySelectorAll('.page-fill').forEach(canvas => {
           const ctx = canvas.getContext('2d');
           if (USE_BLACK_BG) {
@@ -499,8 +563,6 @@ function openPrintView() {
 function openPreviewModal(index) {
   const card = cachedImages[index];
   if (!card) return;
-
-  // Prevent duplicate modals
   if (document.getElementById('previewOverlay')) return;
 
   document.body.classList.add('modal-open');
@@ -525,15 +587,9 @@ function openPreviewModal(index) {
     </div>
   `;
 
-  // Close on overlay click (outside card)
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) closePreviewModal();
-  });
-
-  // Close button
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closePreviewModal(); });
   overlay.querySelector('.preview-close').addEventListener('click', closePreviewModal);
 
-  // Quantity controls
   const controls = overlay.querySelector('.preview-controls');
   controls.addEventListener('click', (e) => {
     const btn = e.target.closest('.qty-btn');
@@ -547,19 +603,10 @@ function openPreviewModal(index) {
     controls.querySelector('.qty-display').textContent = `×${next}`;
   });
 
-  // ESC to close
-  const onKey = (e) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      closePreviewModal();
-    }
-  };
+  const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); closePreviewModal(); } };
   document.addEventListener('keydown', onKey, { once: true });
 
-  // Append
   document.body.appendChild(overlay);
-
-  // Focus close for accessibility
   overlay.querySelector('.preview-close').focus();
 
   function closePreviewModal() {
@@ -571,15 +618,11 @@ function openPreviewModal(index) {
 
 // ================= Spinner icon + rotating messages =================
 const spinnerIcon = document.getElementById('spinnerIcon');
-
-// IMPORTANT: match filename case with your actual files on disk
 const iconPaths = [
   'public/icons/FF-ICON-1.png',
   'public/icons/FF-ICON-2.png',
   'public/icons/FF-ICON-3.png'
 ];
-
-// Lines that rotate along with the icon
 const quips = [
   'Summoning proxies',
   'Shuffling decklists',
@@ -602,12 +645,10 @@ function updateLoadingCopy(index) {
   }
 }
 
-// Set initial state
 let currentIconIndex = 0;
 if (spinnerIcon) spinnerIcon.src = iconPaths[currentIconIndex];
 updateLoadingCopy(currentIconIndex);
 
-// Rotate every 5s: icon + text together
 setInterval(() => {
   currentIconIndex = (currentIconIndex + 1) % iconPaths.length;
   if (spinnerIcon) spinnerIcon.src = iconPaths[currentIconIndex];
