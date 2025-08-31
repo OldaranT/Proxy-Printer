@@ -28,7 +28,7 @@ const CONFIG = {
   },
 
   // Back image for duplex printing
-  BACK_IMAGE_URL: 'https://i.imgur.com/LdOBU1I.jpeg',
+  BACK_IMAGE_URL: 'https://cdn.imgchest.com/files/7kzcajvdwp7.png',
 
   // Canvas pixel density (used to size the canvases to the physical page)
   CANVAS_DPI: 96                   // px per inch for the canvas drawing of cutlines & bg panel

@@ -358,7 +358,7 @@ body.modal-open{ overflow: hidden; }
 
 .preview-card{
   position: relative;
-  width: min(90vw, 780px);
+  width: min(45vw, 390px);
   aspect-ratio: 63 / 88;
   border-radius: var(--radius-sm);
   box-shadow:
@@ -458,5 +458,5 @@ body.modal-open{ overflow: hidden; }
 
 /* Responsive modal sizing */
 @media (max-width: 520px){
-  .preview-card{ width: 92vw; }
+  .preview-card{ width: min(70vw, 340px); }  /* adjust if you want smaller/larger */
 }
