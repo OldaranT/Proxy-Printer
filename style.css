@@ -55,6 +55,8 @@ body{
   font-family: system-ui,-apple-system,Segoe UI,Roboto,Inter,Ubuntu,'Helvetica Neue',Arial,sans-serif;
   color:var(--ink);
   background: transparent;
+
+  /* primary zoom (Chromium) */
   zoom: var(--ui-zoom);
 }
 @supports not (zoom: 1){
@@ -63,6 +65,7 @@ body{
     transform-origin: top center;
   }
 }
+
 body::before{
   content:"";
   position: fixed;
@@ -325,7 +328,7 @@ body.modal-open { overflow: hidden; }
 }
 
 .preview-card{
-  position: relative;
+  position: relative; z-index: 0;
   background: var(--bg-stack); background-repeat:no-repeat; background-size:cover;
   color: var(--ink);
   border: 1px solid rgba(0,0,0,.08);
@@ -336,9 +339,9 @@ body.modal-open { overflow: hidden; }
   max-width: min(90vw, 520px);
 }
 
-/* Close button */
+/* Close button (X) — top-right of modal card */
 .preview-close{
-  position: absolute; top: 8px; right: 8px; z-index: 3;
+  position: absolute; top: 8px; right: 8px; left: auto !important; z-index: 30;
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 36px; height: 30px; padding: 0 12px; border-radius: var(--radius-ssm);
   border: 1px solid rgba(255,255,255,.18);
@@ -351,16 +354,17 @@ body.modal-open { overflow: hidden; }
 
 /* Image area */
 .preview-image-wrap{
-  position: relative; width: 100%; aspect-ratio: 63 / 88;
+  position: relative; z-index: 1;
+  width: 100%; aspect-ratio: 63 / 88;
   background: #0e1b15; border-radius: 10px; overflow: hidden; margin-bottom: 12px;
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 16px 28px rgba(0,0,0,.35), 0 0 0 2px rgba(0,0,0,.08);
 }
 .preview-image-wrap img{ max-width:100%; max-height:100%; object-fit:contain; display:block }
 
-/* Modal flip button */
+/* Modal flip button — top-left inside the image area */
 .preview-flip{
-  position: absolute; top: 8px; left: 8px; z-index: 5;
+  position: absolute; top: 8px; left: 8px; right: auto !important; z-index: 20;
   display: inline-flex; align-items: center; justify-content: center;
   width: 36px; height: 30px; padding: 0; border-radius: var(--radius-ssm);
   border: 1px solid rgba(255,255,255,.18);
@@ -428,7 +432,7 @@ body.modal-open { overflow: hidden; }
   transform-origin: 50% 50%;
 }
 
-/* In case any old SVGs remain in DOM for these controls, hide them to prevent double icons */
+/* Prevent any old inline SVGs from doubling icons */
 .flip-badge svg,
 .preview-flip svg,
 .category-indicator svg,

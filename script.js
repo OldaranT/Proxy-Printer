@@ -1,4 +1,3 @@
-// ---------- Tweakable constants ----------
 const CONFIG = {
   PAGE_SIZES_MM: { A4: { W: 210, H: 297 }, A3: { W: 297, H: 420 } },
   DEFAULT_PAGE: 'A4',
@@ -23,9 +22,9 @@ const CONFIG = {
   BACK_FLIP_MODE: 'long',
 
   // --- Spinner animation assets (JSON + SVG icons) ---
-  ANIM_ICON_DIR: '/public/icons/animation/',                 // folder where icons live
-  ANIM_ICON_MANIFEST: '/public/icons/animation/manifest.json',// JSON ["icon-animation-1.svg", ...]
-  LOADING_TEXT_URL: '/public/strings/loading.json',          // { quips: [...], hints: [...] }
+  ANIM_ICON_DIR: '/public/icons/animation/',
+  ANIM_ICON_MANIFEST: '/public/icons/animation/manifest.json',
+  LOADING_TEXT_URL: '/public/strings/loading.json',
 
   // fallback if manifest can't be read:
   ANIM_FALLBACK_COUNT: 300,
@@ -34,7 +33,6 @@ const CONFIG = {
   // spinner rotation (ms)
   SPINNER_ROTATE_MS: 5000
 };
-// ----------------------------------------
 
 let cachedImages = [];
 let cachedDeckName = "Deck";
@@ -97,7 +95,6 @@ const SpinnerAnimator = (() => {
   let quipEl = null;          // #loading .quip
   let hintEl = null;          // #loading .hint
 
-  // read theme colors
   function themePalette() {
     const cs = getComputedStyle(document.documentElement);
     const pick = (name, def) => (cs.getPropertyValue(name) || def).trim() || def;
@@ -107,7 +104,6 @@ const SpinnerAnimator = (() => {
     return [c400, c500, c600];
   }
 
-  // make SVG colorable by currentColor
   function normalizeSVGColors(svgText) {
     try {
       return svgText
