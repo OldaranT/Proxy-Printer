@@ -41,7 +41,7 @@ const SPINNER = {
   LOADING_JSON_URL: 'public/strings/loading.json',
   COLORS: [
     '#21a06a', '#1a7a52', '#146045', '#0f3d2e', '#0d3123',
-    '#2cd39a', '#7dd3b0', '#99e2c6' // a few lighter accents
+    '#2cd39a', '#7dd3b0', '#99e2c6'
   ],
   INTERVAL_MS: 5000
 };
@@ -337,6 +337,11 @@ function cssEscape(s) {
   if (window.CSS && CSS.escape) return CSS.escape(s);
   return String(s).replace(/["\\#.:?[\]()]/g, '\\$&');
 }
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[c]);
+}
 
 // =============== Load deck ===============
 async function loadDeck() {
@@ -495,44 +500,46 @@ function openPrintView() {
     CONFIG.CUTLINE.OFFSET_FROM_EDGE_MM + CONFIG.CUTLINE.LENGTH_MM + CONFIG.BLEED_EXTRA_MM;
   const BLEED_COLOR = useBlackBg ? '#000000' : '#ffffff';
 
-  function buildFrontSlotsHTML(items, perPage) {
+  function slotsWithOccupancy(items, perPage) {
     const slots = new Array(perPage).fill(null);
+    const occ = [];
     for (let i = 0; i < Math.min(items.length, perPage); i++) {
       slots[i] = items[i].front;
+      occ.push(i);
     }
-    return slots.map(src => src
-      ? `<div class="slot" style="--bleed:${BLEED_MM}mm; --bleed-color:${BLEED_COLOR};">
-           <div class="bleed"></div>
-           <img src="${src}" alt="Card front" />
-         </div>`
-      : `<div class="slot" style="--bleed:${BLEED_MM}mm; --bleed-color:${BLEED_COLOR};">
-           <div class="bleed"></div>
-         </div>`
-    ).join('');
+    return { slots, occ };
   }
 
-  function buildBackSlotsHTML(items, perPage) {
+  function backSlotsWithOccupancy(items, perPage) {
     const slots = new Array(perPage).fill(null);
+    const occ = [];
     for (let k = 0; k < Math.min(items.length, perPage); k++) {
       const idxBack = mapBackIndex(k, GRID_COLS, GRID_ROWS, CONFIG.BACK_FLIP_MODE);
       slots[idxBack] = items[k].back;
+      occ.push(idxBack);
     }
+    return { slots, occ };
+  }
+
+  function buildSlotsHTML(slots) {
+    // Only render an <img> for occupied slots; empty stays empty.
     return slots.map(src => src
-      ? `<div class="slot" style="--bleed:${BLEED_MM}mm; --bleed-color:${BLEED_COLOR};">
-           <div class="bleed"></div>
-           <img src="${src}" alt="Card back" />
-         </div>`
-      : `<div class="slot" style="--bleed:${BLEED_MM}mm; --bleed-color:${BLEED_COLOR};">
-           <div class="bleed"></div>
-         </div>`
+      ? `<div class="slot"><img src="${src}" alt="Card" /></div>`
+      : `<div class="slot empty"></div>`
     ).join('');
   }
 
-  function buildPageHTML(slotsHTML, isBack = false) {
+  function buildPageHTML(slotsHTML, occupiedIdx, isBack = false) {
     return `
-      <div class="page ${isBack ? 'back' : 'front'}">
+      <div class="page ${isBack ? 'back' : 'front'}"
+           data-occupied="${occupiedIdx.join(',')}">
+        <!-- page background canvas (unused visually, reserved) -->
         <canvas class="page-fill" width="${CANVAS_W_PX}" height="${CANVAS_H_PX}"
           style="position:absolute; left:0; top:0; width:${PAGE_W}mm; height:${PAGE_H}mm; z-index:-5;"></canvas>
+
+        <!-- BLEED layer: drawn rectangles only where slots are occupied -->
+        <canvas class="bleed-layer" width="${CANVAS_W_PX}" height="${CANVAS_H_PX}"
+          style="position:absolute; left:0; top:0; width:${PAGE_W}mm; height:${PAGE_H}mm; z-index:5;"></canvas>
 
         <div class="sheet" style="
           position:absolute;
@@ -560,12 +567,12 @@ function openPrintView() {
   for (let i = 0; i < itemsAll.length; i += perPage) {
     const chunkItems = itemsAll.slice(i, i + perPage);
 
-    const frontSlots = buildFrontSlotsHTML(chunkItems, perPage);
-    pages.push(buildPageHTML(frontSlots, false));
+    const { slots: frontSlotsArr, occ: frontOcc } = slotsWithOccupancy(chunkItems, perPage);
+    pages.push(buildPageHTML(buildSlotsHTML(frontSlotsArr), frontOcc, false));
 
     if (addBackground) {
-      const backSlots = buildBackSlotsHTML(chunkItems, perPage);
-      pages.push(buildPageHTML(backSlots, true));
+      const { slots: backSlotsArr, occ: backOcc } = backSlotsWithOccupancy(chunkItems, perPage);
+      pages.push(buildPageHTML(buildSlotsHTML(backSlotsArr), backOcc, true));
     }
   }
 
@@ -587,22 +594,12 @@ function openPrintView() {
           font-family: system-ui, Segoe UI, Roboto, Inter, Arial, sans-serif;
         }
         .sheet { position: absolute; }
-        /* Allow bleed to extend outside the card cell */
         .sheet .slot {
           width: ${CONFIG.CARD_MM.W}mm;
           height: ${CONFIG.CARD_MM.H}mm;
           position: relative;
           display: block;
-          overflow: visible;        /* was hidden — must be visible for bleed */
-        }
-        .sheet .slot .bleed {
-          position: absolute;
-          left: calc(-1 * var(--bleed));
-          top:  calc(-1 * var(--bleed));
-          width:  calc(100% + var(--bleed) * 2);
-          height: calc(100% + var(--bleed) * 2);
-          background: var(--bleed-color);
-          z-index: 0;
+          overflow: hidden;
         }
         .sheet .slot img {
           position: relative;
@@ -621,8 +618,10 @@ function openPrintView() {
 
         const OFFSET_MM = ${CONFIG.CUTLINE.OFFSET_FROM_EDGE_MM};
         const LENGTH_MM = ${CONFIG.CUTLINE.LENGTH_MM};
+        const EXTRA_MM  = ${CONFIG.BLEED_EXTRA_MM};
         const STROKE_PX = ${CONFIG.CUTLINE.STROKE_PX};
         const COLOR = ${JSON.stringify(CONFIG.CUTLINE.COLOR)};
+        const BLEED_COLOR = ${JSON.stringify(BLEED_COLOR)};
 
         const PAGE_W = ${PAGE_W};
         const PAGE_H = ${PAGE_H};
@@ -633,6 +632,8 @@ function openPrintView() {
         const GRID_ROWS = ${GRID_ROWS};
         const MARGIN_L = ${MARGIN_L};
         const MARGIN_T = ${MARGIN_T};
+
+        const BLEED_OUTER_MM = OFFSET_MM + LENGTH_MM + EXTRA_MM;
 
         function drawCornerMarks(ctx, x, y, w, h, pxPerMM_X, pxPerMM_Y) {
           const offX = OFFSET_MM * pxPerMM_X;
@@ -676,6 +677,7 @@ function openPrintView() {
           ctx.stroke();
         }
 
+        // Draw CUTLINES
         document.querySelectorAll('.cutlines canvas').forEach(canvas => {
           const ctx = canvas.getContext('2d');
           const pxPerMM_X = canvas.width / PAGE_W;
@@ -696,6 +698,53 @@ function openPrintView() {
               drawCornerMarks(ctx, x, y, cardW, cardH, pxPerMM_X, pxPerMM_Y);
             }
           }
+        });
+
+        // Draw BLEED rectangles ONLY for occupied slots
+        document.querySelectorAll('.page').forEach(page => {
+          const canvas = page.querySelector('.bleed-layer');
+          if (!canvas) return;
+
+          const occStr = page.getAttribute('data-occupied') || '';
+          const occupied = occStr
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean)
+            .map(n => parseInt(n, 10))
+            .filter(n => Number.isFinite(n) && n >= 0);
+
+          if (!occupied.length) return;
+
+          const ctx = canvas.getContext('2d');
+          const pxPerMM_X = canvas.width / PAGE_W;
+          const pxPerMM_Y = canvas.height / PAGE_H;
+
+          const left = MARGIN_L * pxPerMM_X;
+          const top  = MARGIN_T * pxPerMM_Y;
+
+          const cardW = CARD_W * pxPerMM_X;
+          const cardH = CARD_H * pxPerMM_Y;
+          const gapX  = GAP * pxPerMM_X;
+          const gapY  = GAP * pxPerMM_Y;
+
+          const bleedX = BLEED_OUTER_MM * pxPerMM_X;
+          const bleedY = BLEED_OUTER_MM * pxPerMM_Y;
+
+          ctx.fillStyle = BLEED_COLOR;
+
+          occupied.forEach(idx => {
+            const r = Math.floor(idx / GRID_COLS);
+            const c = idx % GRID_COLS;
+            const x = left + c * (cardW + gapX);
+            const y = top  + r * (cardH + gapY);
+            // rectangle that extends OUTSIDE the card edges by BLEED_OUTER_MM
+            ctx.fillRect(
+              x - bleedX,
+              y - bleedY,
+              cardW + 2 * bleedX,
+              cardH + 2 * bleedY
+            );
+          });
         });
 
         function whenImagesLoaded() {
@@ -875,7 +924,6 @@ async function setSpinnerIcon(index) {
     host.style.height = '46px';
     host.style.color = color;
 
-    // If the SVG doesn't use currentColor, try a quick tint for common attributes
     host.querySelectorAll('svg').forEach(sv => {
       sv.setAttribute('width', '46');
       sv.setAttribute('height', '46');
@@ -904,11 +952,4 @@ function updateLoadingCopy(index) {
   const hintEl = document.querySelector('#loading .spinner-copy .hint');
   if (quipEl) quipEl.innerHTML = `${(loadingQuips[index % loadingQuips.length]) || 'Loading'} <span class="dots"><span>•</span><span>•</span><span>•</span></span>`;
   if (hintEl && loadingHints.length) hintEl.textContent = loadingHints[index % loadingHints.length];
-}
-
-// =============== Utilities ===============
-function escapeHTML(s) {
-  return String(s).replace(/[&<>"']/g, c => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  })[c]);
 }
