@@ -1,4 +1,3 @@
-// script.js
 
 // ---------- Tweakable constants ----------
 const CONFIG = {
@@ -24,20 +23,274 @@ const CONFIG = {
    */
   BACK_FLIP_MODE: 'long',
 
-  /** Animated loading icons directory & manifest file */
-  ANIM_ICON_DIR: 'public/icons/animation/',
-  ANIM_ICON_MANIFEST: 'public/icons/animation/manifest.json',   // ["file1.svg","file2.svg",...]
+  // --- Spinner animation assets (JSON + SVG icons) ---
+  ANIM_ICON_DIR: '/public/icons/animation/',                // folder where icons live
+  ANIM_ICON_MANIFEST: '/public/icons/animation/manifest.json', // JSON file with ["icon-animation-1.svg", ...]
+  LOADING_TEXT_URL: '/public/strings/loading.json',         // { quips: [...], hints: [...] }
 
-  /** Loading text JSON (externalized) */
-  LOADING_TEXT_URL: 'public/strings/loading.json',               // { "quips":[...], "hints":[...] }
+  // fallback if manifest can't be read:
+  ANIM_FALLBACK_COUNT: 300,
+  ANIM_FALLBACK_PATTERN: (n) => `icon-animation-${n}.svg`,
 
-  SPINNER_INTERVAL_MS: 5000
+  // spinner rotation (ms)
+  SPINNER_ROTATE_MS: 5000
 };
 // ----------------------------------------
 
 let cachedImages = [];
 let cachedDeckName = "Deck";
 let categoryOrderFromServer = [];
+
+// ================== Small utils ==================
+function clampQty(n) {
+  n = Number.isFinite(+n) ? +n : 0;
+  return Math.max(0, Math.floor(n));
+}
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = (Math.random() * (i + 1)) | 0;
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function pathVariants(p) {
+  // Try common public/ vs root path variants automatically.
+  const norm = String(p).replace(/^\.?\//, "");
+  const noPublic = norm.replace(/^public\//, "");
+  return [norm, "/" + norm, noPublic, "/" + noPublic];
+}
+async function tryFetchAny(urls, opts) {
+  for (const u of urls) {
+    try {
+      const res = await fetch(u, opts);
+      console.log(`[fetch] ${u} → ${res.status}`);
+      if (res.ok) return { url: u, res };
+    } catch (e) {
+      console.warn(`[fetch] ${u} → error`, e);
+    }
+  }
+  return null;
+}
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[c]);
+}
+function cssEscape(s) {
+  if (window.CSS && CSS.escape) return CSS.escape(s);
+  return String(s).replace(/["\\#.:?[\]()]/g, '\\$&');
+}
+function extractDeckUrl(url) { return url.trim(); }
+
+// ================== Spinner / Loading overlay ==================
+const SpinnerAnimator = (() => {
+  let icons = [];             // full URLs to SVGs
+  let iconIndex = 0;
+  let quipPool = [];
+  let hintPool = [];
+  let quipIndex = 0;
+  let hintIndex = 0;
+  let timer = null;
+
+  // DOM refs (filled by init)
+  let ringEl = null;          // .spinner-ring
+  let iconHost = null;        // #spinnerIcon (we'll ensure it's a <div>)
+  let quipEl = null;          // #loading .quip
+  let hintEl = null;          // #loading .hint
+
+  // read theme colors from CSS vars (fallback to sane defaults)
+  function themePalette() {
+    const cs = getComputedStyle(document.documentElement);
+    const pick = (name, def) => (cs.getPropertyValue(name) || def).trim() || def;
+    const c400 = pick('--forest-400', '#21a06a');
+    const c500 = pick('--forest-500', '#1a7a52');
+    const c600 = pick('--forest-600', '#146045');
+    return [c400, c500, c600];
+  }
+
+  // Normalize SVG to be colorable via currentColor, and wrap it
+  function normalizeSVGColors(svgText) {
+    try {
+      // Make fills/strokes inherit currentColor to allow dynamic theming
+      let t = svgText
+        .replace(/fill="[^"]*"/gi, 'fill="currentColor"')
+        .replace(/stroke="[^"]*"/gi, 'stroke="currentColor"');
+
+      // Ensure an explicit width/height or viewBox is preserved; most already have it.
+      // Return sanitized text
+      return t;
+    } catch {
+      return svgText;
+    }
+  }
+
+  function ensureDivHost() {
+    const el = document.getElementById('spinnerIcon');
+    if (!el) return null;
+    if (el.tagName.toLowerCase() === 'img') {
+      // Replace <img> with <div> so it doesn’t preload PNG and can host inline SVG
+      const div = document.createElement('div');
+      div.id = el.id;
+      div.className = el.className || 'spinner-icon';
+      div.setAttribute('aria-hidden', 'true');
+      el.replaceWith(div);
+      return div;
+    }
+    return el;
+  }
+
+  async function loadManifest() {
+    try{
+      const candidates = pathVariants(CONFIG.ANIM_ICON_MANIFEST);
+      console.log("[manifest] candidates:", candidates);
+      const hit = await tryFetchAny(candidates, { cache: "no-store" });
+      if (!hit) throw new Error("manifest not found via any candidate");
+
+      const arr = await hit.res.json();
+      console.log("[manifest] using:", hit.url, "items:", Array.isArray(arr) ? arr.length : typeof arr);
+
+      let files = [];
+      if (Array.isArray(arr)) {
+        if (typeof arr[0] === "string") {
+          files = arr.filter(x => typeof x === "string" && /\.svg$/i.test(x));
+        } else if (typeof arr[0] === "object" && arr[0]) {
+          // supports object-style manifests too (album/file/filename/name)
+          files = arr
+            .map(o => o.album || o.file || o.filename || o.name)
+            .filter(v => typeof v === "string" && /\.svg$/i.test(v));
+        }
+      }
+
+      const seen = new Set();
+      icons = files
+        .filter(f => !seen.has(f.toLowerCase()) && seen.add(f.toLowerCase()))
+        .map(f => CONFIG.ANIM_ICON_DIR + f);
+
+      if (!icons.length) {
+        console.warn("[manifest] parsed but no .svg entries found; falling back to generated list");
+        const N = CONFIG.ANIM_FALLBACK_COUNT || 300;
+        icons = Array.from({length: N}, (_, i) => CONFIG.ANIM_ICON_DIR + CONFIG.ANIM_FALLBACK_PATTERN(i+1));
+      }
+    } catch (e) {
+      console.warn("[manifest] failed; falling back to generated icon list:", e);
+      const N = CONFIG.ANIM_FALLBACK_COUNT || 300;
+      icons = Array.from({length: N}, (_, i) => CONFIG.ANIM_ICON_DIR + CONFIG.ANIM_FALLBACK_PATTERN(i+1));
+    }
+  }
+
+  async function loadStrings() {
+    try{
+      const candidates = pathVariants(CONFIG.LOADING_TEXT_URL);
+      console.log("[strings] candidates:", candidates);
+      const hit = await tryFetchAny(candidates, { cache: "no-store" });
+      if (!hit) throw new Error("strings not found via any candidate");
+
+      const json = await hit.res.json();
+      console.log("[strings] using:", hit.url);
+
+      const quips = Array.isArray(json.quips) ? json.quips : [];
+      const hints = Array.isArray(json.hints) ? json.hints : [];
+      quipPool = shuffle([...quips]);
+      hintPool = shuffle([...hints]);
+      quipIndex = 0; hintIndex = 0;
+
+      // First draw immediately
+      applyText();
+    } catch(e) {
+      console.warn("[strings] failed, using defaults:", e);
+      quipPool = shuffle([
+        "Summoning proxies","Shuffling decklists","Fetching art & frames"
+      ]);
+      hintPool = shuffle([
+        "We’re scraping your Archidekt/Moxfield deck — bigger decks can take a bit longer.",
+        "Counting card quantities & images — hang tight!",
+        "Optimizing images for crisp print — almost there."
+      ]);
+      quipIndex = 0; hintIndex = 0;
+      applyText();
+    }
+  }
+
+  function applyText() {
+    if (quipEl && quipPool.length) {
+      const q = quipPool[quipIndex % quipPool.length];
+      quipEl.innerHTML = `${escapeHTML(q)} <span class="dots"><span>•</span><span>•</span><span>•</span></span>`;
+    }
+    if (hintEl && hintPool.length) {
+      const h = hintPool[hintIndex % hintPool.length];
+      hintEl.textContent = h;
+    }
+  }
+
+  async function swapIcon() {
+    if (!icons.length || !iconHost) return;
+
+    // pick next icon URL (loop after shuffle)
+    if (iconIndex === 0) {
+      icons = shuffle(icons); // reshuffle each cycle to keep it fresh
+    }
+    const url = icons[iconIndex % icons.length];
+    iconIndex++;
+
+    // pick a theme color each time
+    const palette = themePalette();
+    const color = palette[(Math.random() * palette.length) | 0];
+
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      let svgText = await res.text();
+      svgText = normalizeSVGColors(svgText);
+
+      // mount inline SVG; color with currentColor via style
+      iconHost.innerHTML = svgText;
+      const svg = iconHost.querySelector('svg');
+      if (svg) {
+        svg.setAttribute('aria-hidden', 'true');
+        svg.style.display = 'block';
+        svg.style.width = '46px';
+        svg.style.height = '46px';
+        svg.style.color = color;     // apply theme color
+        svg.style.fill = 'currentColor';
+        svg.style.stroke = 'currentColor';
+      }
+      // spinner ring accent
+      if (ringEl) {
+        ringEl.style.borderTopColor = color;
+      }
+    } catch (e) {
+      console.warn('[spinner] failed to load icon', url, e);
+      // leave whatever was there; ring stays the same color
+    }
+  }
+
+  function tick() {
+    swapIcon();
+    // advance text too
+    quipIndex++;
+    hintIndex++;
+    applyText();
+  }
+
+  async function init() {
+    ringEl = document.querySelector('#loading .spinner-ring');
+    iconHost = ensureDivHost();
+    quipEl = document.querySelector('#loading .spinner-copy .quip');
+    hintEl = document.querySelector('#loading .spinner-copy .hint');
+
+    await Promise.all([loadManifest(), loadStrings()]);
+    // immediate first paint
+    await swapIcon();
+    applyText();
+
+    // start rotation
+    clearInterval(timer);
+    timer = setInterval(tick, CONFIG.SPINNER_ROTATE_MS);
+  }
+
+  return { init, tick };
+})();
 
 // =============== Boot ===============
 document.addEventListener('DOMContentLoaded', () => {
@@ -55,8 +308,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Initialize the spinner animator (icons + fun copy from JSON)
-  SpinnerAnimator.init();
+  // Init the animated spinner (icons + text from JSON)
+  SpinnerAnimator.init().catch(e => console.warn('Spinner init failed', e));
 });
 
 // =============== Totals Bar (UI) ===============
@@ -77,7 +330,6 @@ function ensureTotalsBar() {
 
   updateTotalsBar();
 }
-
 function getTotals() {
   let total = 0;
   let zeroed = 0;
@@ -88,7 +340,6 @@ function getTotals() {
   }
   return { total, zeroed };
 }
-
 function updateTotalsBar() {
   const { total, zeroed } = getTotals();
   const totalEl = document.getElementById('totalCount');
@@ -97,16 +348,10 @@ function updateTotalsBar() {
   if (zeroEl) zeroEl.textContent = String(zeroed);
 }
 
-// =============== Helpers ===============
-function clampQty(n) {
-  n = Number.isFinite(+n) ? +n : 0;
-  return Math.max(0, Math.floor(n));
-}
-
+// =============== Quantity helpers ===============
 function applyZeroStateClass(tile, qty) {
   tile?.classList.toggle('is-zero', qty === 0);
 }
-
 function setCardQuantity(index, qty) {
   if (!cachedImages[index]) return;
   const newQty = clampQty(qty);
@@ -131,9 +376,7 @@ function setCardQuantity(index, qty) {
   }
 }
 
-function extractDeckUrl(url) { return url.trim(); }
-
-// Group by category (preserve server order if provided)
+// =============== Grouping & Overview ===============
 function groupByCategory(cards) {
   const groups = new Map();
   const order = [];
@@ -162,14 +405,39 @@ function groupByCategory(cards) {
 
   return order.map(cat => [cat, groups.get(cat)]);
 }
-
 function countsForCategory(cards) {
   const uniqueCount = cards.length;
   const copyCount = cards.reduce((sum, c) => sum + clampQty(c.quantity ?? 0), 0);
   return { uniqueCount, copyCount };
 }
 
-// =============== Overview (categories) ===============
+// Font Awesome glyph helpers (will show as text if FA not loaded yet)
+const GLYPH = {
+  FLIP: "\uf021",
+  PLUS: "\uf067",
+  MINUS: "\uf068",
+  CLOSE: "\uf00d"
+};
+function makeGlyphButton({ className, title, aria, glyph, sizePx=18 }) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = className;
+  btn.title = title || '';
+  if (aria) btn.setAttribute('aria-label', aria);
+  btn.textContent = glyph;
+  // nudge some inline styles so it looks decent even without FA CSS
+  btn.style.fontFamily = "var(--icon-font, 'Font Awesome 6 Free', 'Font Awesome 5 Free', system-ui, sans-serif)";
+  btn.style.fontWeight = '900';
+  btn.style.fontSize = '14px';
+  btn.style.lineHeight = '1';
+  btn.style.display = 'inline-flex';
+  btn.style.alignItems = 'center';
+  btn.style.justifyContent = 'center';
+  btn.style.minWidth = sizePx + 'px';
+  btn.style.minHeight = Math.round(sizePx * 0.9) + 'px';
+  return btn;
+}
+
 function renderOverviewGrid() {
   const grid = document.getElementById('cardGrid');
   grid.className = 'categories-wrap';
@@ -186,23 +454,43 @@ function renderOverviewGrid() {
 
     const header = document.createElement('div');
     header.className = 'category-title';
-    header.innerHTML = `
-      <div class="category-left" role="button" tabindex="0" aria-expanded="true" aria-controls="">
-        <span class="category-indicator" aria-hidden="true"></span>
-        <span class="category-name">${escapeHTML(category)}</span>
-      </div>
-      <span class="category-meta">
-        <span class="category-uniques" title="Unique cards">${uniqueCount} unique</span>
-        <span class="category-count" title="Total copies to print">${copyCount}</span>
-      </span>
+
+    // left toggle area (keyboard accessible)
+    const left = document.createElement('div');
+    left.className = 'category-left';
+    left.setAttribute('role', 'button');
+    left.setAttribute('tabindex', '0');
+    left.setAttribute('aria-expanded', 'true');
+
+    // indicator (minus by default, i.e., expanded)
+    const indicator = document.createElement('span');
+    indicator.className = 'category-indicator';
+    indicator.textContent = GLYPH.MINUS;
+    indicator.style.fontFamily = "var(--icon-font, 'Font Awesome 6 Free', 'Font Awesome 5 Free', system-ui, sans-serif')";
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'category-name';
+    nameEl.textContent = category;
+
+    left.appendChild(indicator);
+    left.appendChild(nameEl);
+
+    const meta = document.createElement('span');
+    meta.className = 'category-meta';
+    meta.innerHTML = `
+      <span class="category-uniques" title="Unique cards">${uniqueCount} unique</span>
+      <span class="category-count" title="Total copies to print">${copyCount}</span>
     `;
+
+    header.appendChild(left);
+    header.appendChild(meta);
     section.appendChild(header);
 
     const wrap = document.createElement('div');
     wrap.className = 'category-grid';
     const wrapId = `cat_${Math.random().toString(36).slice(2)}`;
     wrap.id = wrapId;
-    header.querySelector('.category-left')?.setAttribute('aria-controls', wrapId);
+    left.setAttribute('aria-controls', wrapId);
 
     cards.forEach(card => {
       const i = card._idx;
@@ -211,6 +499,7 @@ function renderOverviewGrid() {
       tile.dataset.index = String(i);
       if (card.backImg) tile.classList.add('has-back');
 
+      // init per-card face view (front by default)
       if (typeof card._showBack !== 'boolean') card._showBack = false;
 
       const qty = clampQty(card.quantity ?? 1);
@@ -220,17 +509,20 @@ function renderOverviewGrid() {
       img.src = card._showBack && card.backImg ? card.backImg : card.img;
       img.alt = card.name ?? 'Card';
 
+      // quantity badge (always visible)
       const badge = document.createElement('span');
       badge.className = 'qty-badge';
       badge.textContent = `×${qty}`;
 
-      // flip badge (DFC only) — uses icon font via CSS
+      // flip badge (DFC only) — glyph
       if (card.backImg) {
-        const flip = document.createElement('button');
-        flip.type = 'button';
-        flip.className = 'flip-badge';
-        flip.title = 'Flip card face';
-        flip.setAttribute('aria-label', `Flip ${card.name}`);
+        const flip = makeGlyphButton({
+          className: 'flip-badge',
+          title: 'Flip card face',
+          aria: `Flip ${card.name}`,
+          glyph: GLYPH.FLIP,
+          sizePx: 22
+        });
         flip.addEventListener('click', (e) => {
           e.stopPropagation();
           card._showBack = !card._showBack;
@@ -243,6 +535,8 @@ function renderOverviewGrid() {
       }
 
       applyZeroStateClass(tile, qty);
+
+      // Open modal on click
       tile.addEventListener('click', () => openPreviewModal(i));
 
       tile.appendChild(img);
@@ -254,20 +548,21 @@ function renderOverviewGrid() {
     grid.appendChild(section);
 
     // Collapsible behavior (default open)
-    const left = header.querySelector('.category-left');
     function toggleSection() {
       const isCollapsed = section.classList.toggle('collapsed');
       wrap.style.display = isCollapsed ? 'none' : '';
       left.setAttribute('aria-expanded', String(!isCollapsed));
-      // indicator icon is handled via CSS ::before, no text swap needed
+      indicator.textContent = isCollapsed ? GLYPH.PLUS : GLYPH.MINUS;
     }
     left.addEventListener('click', toggleSection);
     left.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection(); }
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggleSection();
+      }
     });
   });
 }
-
 function updateCategoryCounts() {
   const grouped = groupByCategory(cachedImages);
   grouped.forEach(([category, cards]) => {
@@ -280,17 +575,6 @@ function updateCategoryCounts() {
     if (uniquesEl) uniquesEl.textContent = `${uniqueCount} unique`;
     if (countEl) countEl.textContent = `${copyCount}`;
   });
-}
-
-// Escapers
-function escapeHTML(s) {
-  return String(s).replace(/[&<>"']/g, c => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  })[c]);
-}
-function cssEscape(s) {
-  if (window.CSS && CSS.escape) return CSS.escape(s);
-  return String(s).replace(/["\\#.:?[\]()]/g, '\\$&');
 }
 
 // =============== Load deck ===============
@@ -332,6 +616,7 @@ async function loadDeck() {
 
     categoryOrderFromServer = Array.isArray(data.categoryOrder) ? data.categoryOrder : [];
 
+    // keep category, quantities and DFC backImg; init face state
     cachedImages = data.images.map((card, i) => ({
       ...card,
       quantity: clampQty(card.quantity ?? 1),
@@ -361,7 +646,6 @@ function computeGridDims(pageWmm, pageHmm, cardWmm, cardHmm, gapmm) {
   const rows = Math.max(1, Math.floor((pageHmm + gapmm) / (cardHmm + gapmm)));
   return { cols, rows };
 }
-
 function choosePageGeometry(sizeKey, gapmm) {
   const base = CONFIG.PAGE_SIZES_MM[sizeKey];
   let portrait = { W: base.W, H: base.H, orient: 'portrait' };
@@ -374,13 +658,14 @@ function choosePageGeometry(sizeKey, gapmm) {
   const b = computeGridDims(landscape.W, landscape.H, CONFIG.CARD_MM.W, CONFIG.CARD_MM.H, gapmm);
   return (b.cols * b.rows) > (a.cols * a.rows) ? landscape : portrait;
 }
-
 function mapBackIndex(k, cols, rows, flipMode) {
   const r = Math.floor(k / cols);
   const c = k % cols;
   let rr = r, cc = c;
+
   if (flipMode === 'long')      cc = cols - 1 - c; // mirror columns
   else if (flipMode === 'short') rr = rows - 1 - r; // mirror rows
+
   return rr * cols + cc;
 }
 
@@ -514,8 +799,13 @@ function openPrintView() {
         @page { size: ${PAGE_W}mm ${PAGE_H}mm; margin: 0; }
         html, body { margin: 0; padding: 0; background: transparent; }
         .page {
-          position: relative; width: ${PAGE_W}mm; height: ${PAGE_H}mm;
-          page-break-after: always; overflow: hidden; z-index: 0; isolation: isolate;
+          position: relative;
+          width: ${PAGE_W}mm;
+          height: ${PAGE_H}mm;
+          page-break-after: always;
+          overflow: hidden;
+          z-index: 0;
+          isolation: isolate;
           font-family: system-ui, Segoe UI, Roboto, Inter, Arial, sans-serif;
         }
         .sheet { position: absolute; }
@@ -527,11 +817,13 @@ function openPrintView() {
       ${pages.join('')}
       <script>
         document.title = ${JSON.stringify(title)};
+
         const USE_BLACK_BG = ${useBlackBg ? 'true' : 'false'};
         const OFFSET_MM = ${CONFIG.CUTLINE.OFFSET_FROM_EDGE_MM};
         const LENGTH_MM = ${CONFIG.CUTLINE.LENGTH_MM};
         const STROKE_PX = ${CONFIG.CUTLINE.STROKE_PX};
         const COLOR = ${JSON.stringify(CONFIG.CUTLINE.COLOR)};
+
         const PAGE_W = ${PAGE_W};
         const PAGE_H = ${PAGE_H};
         const CARD_W = ${CONFIG.CARD_MM.W};
@@ -648,14 +940,29 @@ function openPreviewModal(index) {
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
 
+  // use current tile face state as starting point
   let showingBack = !!card._showBack;
+
+  const flipBtnHTML = card.backImg
+    ? (() => {
+        const btn = makeGlyphButton({
+          className: 'preview-flip',
+          title: 'Flip card face',
+          aria: 'Flip card face',
+          glyph: GLYPH.FLIP,
+          sizePx: 24
+        });
+        // we'll insert this element string by placeholder and then wire up after insert
+        return btn.outerHTML;
+      })()
+    : '';
 
   overlay.innerHTML = `
     <div class="preview-card" role="document" aria-label="${escapeHTML(card.name ?? 'Card preview')}">
-      <button class="preview-close" aria-label="Close"></button>
+      <button class="preview-close" aria-label="Close">${GLYPH.CLOSE}</button>
 
       <div class="preview-image-wrap">
-        ${card.backImg ? `<button class="preview-flip" type="button" aria-label="Flip card face"></button>` : ``}
+        ${flipBtnHTML}
         <img src="${showingBack && card.backImg ? card.backImg : card.img}" alt="${escapeHTML(card.name ?? 'Card')}" />
       </div>
 
@@ -681,29 +988,37 @@ function openPreviewModal(index) {
   const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); closePreviewModal(overlay); document.removeEventListener('keydown', onKey); } };
   document.addEventListener('keydown', onKey);
 
-  // Flip (modal)
-  overlay.querySelector('.preview-flip')?.addEventListener('click', (e) => {
-    if (!card.backImg) return;
-    e.stopPropagation();
-    showingBack = !showingBack;
-    card._showBack = showingBack; // sync
-    const imgEl = overlay.querySelector('.preview-image-wrap img');
-    if (imgEl) imgEl.src = showingBack ? card.backImg : card.img;
+  // Flip (modal) — attach handler if present
+  const flipBtn = overlay.querySelector('.preview-flip');
+  if (flipBtn && card.backImg) {
+    // apply quick inline styles so glyph looks right
+    flipBtn.style.fontFamily = "var(--icon-font, 'Font Awesome 6 Free', 'Font Awesome 5 Free', system-ui, sans-serif)";
+    flipBtn.style.fontWeight = '900';
+    flipBtn.style.fontSize = '14px';
 
-    const tileImg = document.querySelector(`.card[data-index="${index}"] img`);
-    if (tileImg) tileImg.src = showingBack ? card.backImg : card.img;
-    const tile = document.querySelector(`.card[data-index="${index}"]`);
-    tile?.classList.toggle('showing-back', showingBack);
+    flipBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showingBack = !showingBack;
+      card._showBack = showingBack; // sync to overview state
+      const imgEl = overlay.querySelector('.preview-image-wrap img');
+      if (imgEl) imgEl.src = showingBack ? card.backImg : card.img;
 
-    const btn = overlay.querySelector('.preview-flip');
-    btn?.classList.add('spin');
-    setTimeout(() => btn?.classList.remove('spin'), 500);
-  });
+      // also update the overview tile image immediately
+      const tileImg = document.querySelector(`.card[data-index="${index}"] img`);
+      if (tileImg) tileImg.src = showingBack ? card.backImg : card.img;
+      const tile = document.querySelector(`.card[data-index="${index}"]`);
+      tile?.classList.toggle('showing-back', showingBack);
+
+      flipBtn.classList.add('spin');
+      setTimeout(() => flipBtn.classList.remove('spin'), 500);
+    });
+  }
 
   // Quantity buttons
   overlay.querySelector('.preview-controls')?.addEventListener('click', (e) => {
     const btn = e.target.closest('.qty-btn');
     if (!btn) return;
+
     const idx = Number(overlay.querySelector('.preview-controls')?.dataset.index || -1);
     if (idx < 0) return;
 
@@ -726,7 +1041,6 @@ function openPreviewModal(index) {
   document.body.appendChild(overlay);
   overlay.querySelector('.preview-close')?.focus();
 }
-
 function closePreviewModal(overlayEl) {
   try {
     document.body.classList.remove('modal-open');
@@ -734,204 +1048,3 @@ function closePreviewModal(overlayEl) {
   } catch (_) {}
 }
 
-/* ================= Spinner icons + fun copy (from JSON) ================= */
-function cssVar(name) {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-}
-function hexToRgb(hex){
-  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if(!m) return null;
-  return { r: parseInt(m[1],16), g: parseInt(m[2],16), b: parseInt(m[3],16) };
-}
-function rgbToHsl(r,g,b){
-  r/=255; g/=255; b/=255;
-  const max=Math.max(r,g,b), min=Math.min(r,g,b);
-  let h,s,l=(max+min)/2;
-  if(max===min){h=s=0;}else{
-    const d=max-min;
-    s = l>0.5 ? d/(2-max-min) : d/(max+min);
-    switch(max){
-      case r: h=(g-b)/d + (g<b?6:0); break;
-      case g: h=(b-r)/d + 2; break;
-      case b: h=(r-g)/d + 4; break;
-    }
-    h/=6;
-  }
-  return {h: h*360, s: s*100, l: l*100};
-}
-function hslToHex(h,s,l){
-  h/=360; s/=100; l/=100;
-  const hue2rgb=(p,q,t)=>{ if(t<0)t+=1; if(t>1)t-=1; if(t<1/6)return p+(q-p)*6*t; if(t<1/2)return q; if(t<2/3)return p+(q-p)*(2/3-t)*6; return p; };
-  const q=l<.5? l*(1+s) : l+s-l*s;
-  const p=2*l-q;
-  const r=Math.round(hue2rgb(p,q,h+1/3)*255);
-  const g=Math.round(hue2rgb(p,q,h)*255);
-  const b=Math.round(hue2rgb(p,q,h-1/3)*255);
-  return "#" + [r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
-}
-function tweakLightness(hex, delta){
-  const rgb = hexToRgb(hex); if(!rgb) return hex;
-  const {h,s,l} = rgbToHsl(rgb.r, rgb.g, rgb.b);
-  const nl = Math.max(0, Math.min(100, l + delta));
-  return hslToHex(h,s,nl);
-}
-const rand = (n) => Math.floor(Math.random()*n);
-function shuffle(arr){
-  for(let i=arr.length-1;i>0;i--){
-    const j = Math.floor(Math.random()*(i+1));
-    [arr[i],arr[j]]=[arr[j],arr[i]];
-  }
-  return arr;
-}
-
-const SpinnerAnimator = (() => {
-  let icons = [];         // discovered SVG URLs
-  let quipPool = [];      // from JSON
-  let hintPool = [];      // from JSON
-  let timer = null;
-
-  function ensureContainer(){
-    let el = document.getElementById('spinnerIcon');
-    if(!el) return null;
-    if(el.tagName === 'IMG'){
-      const div = document.createElement('div');
-      div.id = el.id;
-      div.className = el.className;
-      div.setAttribute('aria-hidden','true');
-      el.replaceWith(div);
-      el = div;
-    }
-    return el;
-  }
-
-  async function loadManifest(){
-    try{
-      const res = await fetch(CONFIG.ANIM_ICON_MANIFEST, { cache:'no-store' });
-      if(!res.ok) throw new Error('manifest missing');
-      const arr = await res.json();
-      if(Array.isArray(arr) && arr.length){
-        icons = arr.map(name => CONFIG.ANIM_ICON_DIR + String(name));
-      }
-    }catch(e){
-      console.warn('No animation manifest found; SVG spinner will wait until you add one at', CONFIG.ANIM_ICON_MANIFEST);
-      icons = []; // no guesses; we want SVGs only as requested
-    }
-  }
-
-  async function loadStrings(){
-    try{
-      const res = await fetch(CONFIG.LOADING_TEXT_URL, { cache:'no-store' });
-      if(!res.ok) throw new Error('strings missing');
-      const json = await res.json();
-      const quips = Array.isArray(json.quips) ? json.quips : [];
-      const hints = Array.isArray(json.hints) ? json.hints : [];
-      quipPool = shuffle([...quips]);
-      hintPool = shuffle([...hints]);
-    }catch(e){
-      // Minimal fallbacks so UI isn’t empty if JSON missing
-      quipPool = shuffle([
-        'Summoning proxies','Shuffling decklists','Fetching art & frames'
-      ]);
-      hintPool = shuffle([
-        'We’re scraping your Archidekt/Moxfield deck — bigger decks can take a bit longer.',
-        'Counting card quantities & images — hang tight!',
-        'Optimizing images for crisp print — almost there.'
-      ]);
-      console.warn('Loading text JSON not found at', CONFIG.LOADING_TEXT_URL);
-    }
-  }
-
-  function getThemeAccents(){
-    const base = [
-      cssVar('--forest-400') || '#21a06a',
-      cssVar('--forest-500') || '#1a7a52',
-      cssVar('--forest-600') || '#146045',
-    ].filter(Boolean);
-    const expanded = [];
-    base.forEach(hex=>{
-      expanded.push(hex, tweakLightness(hex, +8), tweakLightness(hex, -8));
-    });
-    return expanded;
-  }
-  function setAccent(hex){
-    document.documentElement.style.setProperty('--spinner-accent', hex);
-    const ring = document.querySelector('.spinner-ring');
-    if(ring){
-      ring.style.borderTopColor = hex;
-      ring.style.borderRightColor = tweakLightness(hex, -12);
-    }
-    const iconWrap = document.getElementById('spinnerIcon');
-    if(iconWrap){ iconWrap.style.color = hex; }
-  }
-
-  function nextFromPool(pool, refillFrom){
-    if(pool.length === 0 && refillFrom?.length) pool.push(...shuffle([...refillFrom]));
-    return pool.length ? pool.pop() : '';
-  }
-
-  function setCopy(){
-    const quipEl = document.querySelector('#loading .spinner-copy .quip');
-    const hintEl = document.querySelector('#loading .spinner-copy .hint');
-    const quip = nextFromPool(quipPool);
-    const hint = nextFromPool(hintPool);
-    if(quipEl){
-      quipEl.innerHTML = `${quip} <span class="dots"><span>•</span><span>•</span><span>•</span></span>`;
-    }
-    if(hintEl){ hintEl.textContent = hint; }
-  }
-
-  async function fetchSvgText(url){
-    try{
-      const res = await fetch(url, { cache:'no-store' });
-      if(!res.ok) return null;
-      return await res.text();
-    }catch(_){ return null; }
-  }
-
-  function colorizeSvgMarkup(svgText){
-    let txt = svgText;
-    // Convert fixed colors to currentColor for tinting
-    txt = txt.replace(/fill="(?!none)[^"]*"/gi, 'fill="currentColor"');
-    txt = txt.replace(/stroke="(?!none)[^"]*"/gi, 'stroke="currentColor"');
-    // Clean inline styles that hardcode colors
-    txt = txt.replace(/style="[^"]*"/gi, (m)=>{
-      const cleaned = m
-        .replace(/fill:\s*(?!none)[#a-z0-9().,\s-]+;?/gi, '')
-        .replace(/stroke:\s*(?!none)[#a-z0-9().,\s-]+;?/gi, '');
-      return cleaned === 'style=""' ? '' : cleaned;
-    });
-    return txt;
-  }
-
-  async function setIcon(){
-    const wrap = ensureContainer();
-    if(!wrap || !icons.length) return;
-
-    const accents = getThemeAccents();
-    setAccent(accents[rand(accents.length)]);
-
-    // pick a random SVG from manifest list
-    const url = icons[rand(icons.length)];
-    const text = await fetchSvgText(url);
-    if(text){
-      wrap.innerHTML = colorizeSvgMarkup(text);
-    }
-  }
-
-  async function tick(){
-    setCopy();
-    await setIcon();
-  }
-
-  return {
-    async init(){
-      ensureContainer();
-      await Promise.all([loadManifest(), loadStrings()]);
-      // first paint immediately (if manifest present)
-      await tick();
-      // rotate
-      clearInterval(timer);
-      timer = setInterval(tick, CONFIG.SPINNER_INTERVAL_MS);
-    }
-  };
-})();
