@@ -362,11 +362,11 @@ body.modal-open { overflow: hidden; }
   max-width: min(90vw, 520px);
 }
 
-/* Close button (X) — top-right of modal card, above everything */
+/* Close button (X) — ORIGINAL placement: top-right inside the modal card */
 .preview-close{
-  position: absolute; top: 8px !important; right: 8px !important; left: auto !important; z-index: 40;
+  position: absolute; top: 8px; right: 8px; z-index: 3;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 36px; height: 30px; padding: 0; border-radius: var(--radius-ssm);
+  min-width: 36px; height: 30px; padding: 0; border-radius: var(--radius-ssm);
   border: 1px solid rgba(255,255,255,.18);
   background: linear-gradient(180deg, var(--forest-500), var(--forest-700));
   color: #fff; font-weight: 800; line-height: 1; font-size: 16px; cursor: pointer;
@@ -385,9 +385,9 @@ body.modal-open { overflow: hidden; }
 }
 .preview-image-wrap img{ max-width:100%; max-height:100%; object-fit:contain; display:block }
 
-/* Modal flip button — top-left inside the image area */
+/* Modal flip button — ORIGINAL placement: top-left inside the image area */
 .preview-flip{
-  position: absolute; top: 8px !important; left: 8px !important; right: auto !important; z-index: 30;
+  position: absolute; top: 8px; left: 8px; z-index: 5;
   display: inline-flex; align-items: center; justify-content: center;
   width: 36px; height: 30px; padding: 0; border-radius: var(--radius-ssm);
   border: 1px solid rgba(255,255,255,.18);

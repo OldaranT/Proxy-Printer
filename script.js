@@ -21,7 +21,7 @@ const CONFIG = {
    */
   BACK_FLIP_MODE: 'long',
 
-  // --- Spinner animation assets (JSON + SVG icons) ---
+  // Spinner animation assets (JSON + SVG icons)
   ANIM_ICON_DIR: '/public/icons/animation/',
   ANIM_ICON_MANIFEST: '/public/icons/animation/manifest.json',
   LOADING_TEXT_URL: '/public/strings/loading.json',
