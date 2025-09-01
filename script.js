@@ -1,5 +1,3 @@
-// script.js
-
 // ---------- Tweakable constants ----------
 const CONFIG = {
   PAGE_SIZES_MM: { A4: { W: 210, H: 297 }, A3: { W: 297, H: 420 } },
@@ -22,7 +20,22 @@ const CONFIG = {
    * 'short' → mirror rows   (flip on short edge)
    * 'none'  → no mirroring
    */
-  BACK_FLIP_MODE: 'long'
+  BACK_FLIP_MODE: 'long',
+
+  /**
+   * Animated loading icons directory & patterns.
+   * If a manifest.json exists in this directory exporting ["file1.svg", ...],
+   * we will use it. Otherwise we attempt common numeric patterns.
+   */
+  ANIM_ICON_DIR: 'public/icons/animation/',
+  ANIM_ICON_PATTERNS: [
+    (i) => `anim-${String(i).padStart(3,'0')}.svg`,
+    (i) => `icon-${String(i).padStart(3,'0')}.svg`,
+    (i) => `${String(i).padStart(3,'0')}.svg`,
+    (i) => `${i}.svg`
+  ],
+
+  SPINNER_INTERVAL_MS: 5000
 };
 // ----------------------------------------
 
@@ -45,6 +58,9 @@ document.addEventListener('DOMContentLoaded', () => {
       sync();
     });
   }
+
+  // Initialize the spinner animator (icons + fun copy)
+  SpinnerAnimator.init();
 });
 
 // =============== Totals Bar (UI) ===============
@@ -757,37 +773,385 @@ function closePreviewModal(overlayEl) {
   } catch (_) {}
 }
 
-// ================= Spinner icon + rotating messages =================
-const spinnerIcon = document.getElementById('spinnerIcon');
-const iconPaths = [
-  'public/icons/FF-ICON-1.png',
-  'public/icons/FF-ICON-2.png',
-  'public/icons/FF-ICON-3.png'
-];
-const quips = [
-  'Summoning proxies',
-  'Shuffling decklists',
-  'Fetching art & frames'
-];
-const hints = [
-  'We’re scraping your Archidekt/Moxfield deck — bigger decks can take a bit longer.',
-  'Counting card quantities & images — hang tight!',
-  'Optimizing images for crisp print — almost there.'
-];
+/* ================= Spinner icons + fun copy ================= */
 
-function updateLoadingCopy(index) {
-  const quipEl = document.querySelector('#loading .spinner-copy .quip');
-  const hintEl = document.querySelector('#loading .spinner-copy .hint');
-  if (quipEl) quipEl.innerHTML = `${quips[index % quips.length]} <span class="dots"><span>•</span><span>•</span><span>•</span></span>`;
-  if (hintEl) hintEl.textContent = hints[index % hints.length];
+/**
+ * Utility to get CSS variable value.
+ */
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
-let currentIconIndex = 0;
-if (spinnerIcon) spinnerIcon.src = iconPaths[currentIconIndex];
-updateLoadingCopy(currentIconIndex);
+/** Simple color helpers (hex/hsl conversions) */
+function hexToRgb(hex){
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if(!m) return null;
+  return { r: parseInt(m[1],16), g: parseInt(m[2],16), b: parseInt(m[3],16) };
+}
+function rgbToHsl(r,g,b){
+  r/=255; g/=255; b/=255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b);
+  let h,s,l=(max+min)/2;
+  if(max===min){h=s=0;}else{
+    const d=max-min;
+    s = l>0.5 ? d/(2-max-min) : d/(max+min);
+    switch(max){
+      case r: h=(g-b)/d + (g<b?6:0); break;
+      case g: h=(b-r)/d + 2; break;
+      case b: h=(r-g)/d + 4; break;
+    }
+    h/=6;
+  }
+  return {h: h*360, s: s*100, l: l*100};
+}
+function hslToHex(h,s,l){
+  h/=360; s/=100; l/=100;
+  const hue2rgb=(p,q,t)=>{ if(t<0)t+=1; if(t>1)t-=1; if(t<1/6)return p+(q-p)*6*t; if(t<1/2)return q; if(t<2/3)return p+(q-p)*(2/3-t)*6; return p; };
+  const q=l<.5? l*(1+s) : l+s-l*s;
+  const p=2*l-q;
+  const r=Math.round(hue2rgb(p,q,h+1/3)*255);
+  const g=Math.round(hue2rgb(p,q,h)*255);
+  const b=Math.round(hue2rgb(p,q,h-1/3)*255);
+  return "#" + [r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+function tweakLightness(hex, delta){
+  const rgb = hexToRgb(hex); if(!rgb) return hex;
+  const {h,s,l} = rgbToHsl(rgb.r, rgb.g, rgb.b);
+  const nl = Math.max(0, Math.min(100, l + delta));
+  return hslToHex(h,s,nl);
+}
 
-setInterval(() => {
-  currentIconIndex = (currentIconIndex + 1) % iconPaths.length;
-  if (spinnerIcon) spinnerIcon.src = iconPaths[currentIconIndex];
-  updateLoadingCopy(currentIconIndex);
-}, 5000);
+/** Random helpers */
+const rand = (n) => Math.floor(Math.random()*n);
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
+
+/** Fun copy pools (~160 lines total) */
+const FUN_QUIPS = shuffle([
+  'Summoning proxies','Shuffling decklists','Fetching art & frames','Untapping lands',
+  'Counting mana rocks','Consulting Scryfall oracles','Convoking helpers',
+  'Rolling for high','Checking sleeves','Greasing the mana dorks',
+  'Casting Brainstorm','Paying the one','Cracking a fetch','Drawing opening seven',
+  'Taking the free mull','Goldfishing the curve','Asking the judge (politely)',
+  'Storm count is rising','Sifting the sideboard','Spot-removing typos',
+  'Top-decking solutions','Fetching basics','Revealing companions',
+  'Cutting to even','Sleeving the stack','Doing combat math',
+  'Polishing the proxy printer','Petting the cat (for luck)','Yelling “responses?”',
+  'Counting devotion','Plotting a two-for-one','Checking state-based actions',
+  'Escaping from the graveyard','Phasing in shortly','Bolting the bird',
+  'Scrying to the top','Feeling the salty sea','Tapping for green',
+  'Fetching shocks (carefully)','Jamming the combo','Making infinite tokens (eventually)',
+  'Kicking the spell','Escalating the charm','Exploring options',
+  'Venturing into the dungeon','Training the model (creature)','Bloodrushing text',
+  'Conniving the list','Discovering synergies','Mapping the board state',
+  'Drawing the hotness','Food-token prepping','Clue-token investigating',
+  'Treasure-token hoarding','Power-stoning the UI','Proliferating features',
+  'Flickering elements','Cycling dead cards','Foretelling good times',
+  'Surveilling lines','Amassing knowledge','Descended enough times',
+  'Crafting the perfect print','Celebrating small wins','Catching missed triggers',
+  'Checking priority','Stacking the stack','Paying ward (probably)',
+  'Avoiding summoning sickness','Training the drafters','Studying the meta',
+  'Tuning the mana base','Fetching fetch-lands','Pondering possibilities',
+  'Cascading into value','Leveling up Sagas','Incubating ideas',
+  'Learning the lines','Extorting a smile','Surging ahead',
+  'Reanimating old tech','Shield-counters online','Arena of ideas',
+  'Reading flavor text','Cutting to odd','Proxy gods be kind',
+  'Time walking the spinner','Miracle incoming?','Drawing out the nuts',
+  'Karnstructing UI','Looting for value','Goading the process',
+  'Sneaking in efficiency','Curving out cleanly','Splicing onto Arcane',
+  'Kicker paid','Forests tapped','Islands open',
+  'Boros-ing through tasks','Dimir secrets loading','Selesnya growth sprouting',
+  'Rakdos party starting','Izzet tinkering','Golgari gardening',
+  'Azorius reviewing','Orzhov taxing','Gruul smashing','Simic adapting'
+]);
+
+const FUN_HINTS = shuffle([
+  'We’re scraping your Archidekt/Moxfield deck — bigger decks can take a bit longer.',
+  'Counting card quantities & images — hang tight!',
+  'Optimizing images for crisp print — almost there.',
+  'Tip: Click a card to set quantity quickly.',
+  'DFC? Tap the flip button on the tile or in the preview.',
+  'Use “Add Spacing” if your printer slightly over-inks.',
+  'Enable “Card Back” for double-sided alignment.',
+  'A3 can fit more per page; A4 is the classic choice.',
+  'You can collapse categories to scan faster.',
+  'The totals bar updates live with every change.',
+  'Cut lines can help with precise trimming.',
+  'Black background helps spoolers with edge bleed.',
+  'Short-edge vs long-edge flip changes back alignment.',
+  'We grouped your deck by type for quicker edits.',
+  'Keyboard tip: Enter/Space toggles category collapse.',
+  'We auto-maximize portrait vs landscape for page fit.',
+  'Click “Open Print Sheet” when you’re ready to go.',
+  'We’re fetching DFC backs when available.',
+  'Proxy responsibly — support the game you love ❤️',
+  'Printing from a desktop browser tends to work best.',
+  'Set quantities to 0 to hide a card from printing.',
+  'Hover a tile to see the quantity badge clearly.',
+  'We use crisp scaling to keep images sharp.',
+  'Your settings (cut lines, spacing) persist until reload.',
+  'Want tighter cuts? Try disabling spacing.',
+  'Need room to breathe? Enable spacing and cut lines.',
+  'Deck names are used in the print window title.',
+  'We remove empty slots at the end of a sheet.',
+  'Back alignment mirrors columns by default (long edge).',
+  'Change “Page Size” toggle for A3/A4 on the fly.',
+  'We love a good curve — and a good kerning.',
+  'Mana fixing the UI… one pixel at a time.',
+  'We’ll open the print dialog after images load.',
+  'Use the preview modal to step quantities by ±5/±10.',
+  'You can flip faces in the preview and on the tile.',
+  'We escape special characters for safe labels.',
+  'Category counts refresh live as you tweak.',
+  'Total pages depend on card count and spacing.',
+  'Re-order categories? We preserve server order.',
+  'We cache images in memory during the session.',
+  'Try black page background for near-edge art.',
+  'Remember to set your printer margin to zero.',
+  'Glossy paper? Lower ink density may help.',
+  'Matte paper? Colors pop with default settings.',
+  'A well-sleeved proxy is a happy proxy.',
+  'We respect your back image on DFCs.',
+  'Backs align to the chosen duplex flip mode.',
+  'Want a custom back? Toggle off and print front-only.',
+  'Shortcuts save time; quality saves paper.',
+  'Fetching additional art variants as needed.',
+  'We’re resisting the urge to “Bolt the Bird.”',
+  'Sagas take a few chapters… so does loading.',
+  'Judge! (It’s fine — everything’s fine.)',
+  'Please don’t shuffle the printer tray.',
+  'If you see green, that’s on brand.',
+  'Tap out for value; untap for prints.',
+  'We’re scrying 2: bottoming jank.',
+  'Your patience is legendary rarity.',
+  'Mana rocks are polished; almost there.',
+  'No proxies were harmed during loading.',
+  'We asked the Orzhov to stop taxing you.',
+  'Our goblins are working overtime.',
+  'Your deck vibes check out.',
+  'Aggro? Control? Midrange? We support it all.',
+  'Combo lines detected — careful on the stack.',
+  'We don’t miss triggers… we hope.',
+  'Printing is lethal next turn.',
+  'Card backs in position — hold priority.',
+  'Resolving images… any responses?',
+  'We’re at end step — got a stop?',
+  'Do you pay the 1? (kidding)',
+  'We stacked the stack for you.',
+  'RNG says this will be gas.',
+  'Tastefully minimizing JPEG artifacts.',
+  'Your tokens are behaving… mostly.',
+  'We tuned the DPI to 96 for layout fidelity.',
+  'We mirrored columns for long-edge duplex by default.',
+  'The spinner changes color using your theme.',
+  'Inline SVG lets us tint icons perfectly.',
+  'If an icon fails to load, we fall back gracefully.',
+  'Remember to hydrate (you and your printer).',
+  'Slight color shifts can occur across papers.',
+  'We keep alt text accessible.',
+  'Deck tech coming together nicely.',
+  'We respect your categories and counts.',
+  'Almost shuffled up and ready to play.',
+]);
+
+/**
+ * SpinnerAnimator:
+ * - Replaces the <img id="spinnerIcon"> (if present) with a DIV so we can inject inline SVG.
+ * - Loads animation icon filenames from manifest.json if present, otherwise guesses patterns.
+ * - Every N seconds: picks a random on-brand accent color + random icon + random quip/hint.
+ * - Icons are colorized by forcing fills/strokes to "currentColor" and styling the wrapper.
+ */
+const SpinnerAnimator = (() => {
+  let icons = [];           // absolute URLs
+  let triedGuesses = false; // whether we attempted to guess names
+  let quipPool = [...FUN_QUIPS];
+  let hintPool = [...FUN_HINTS];
+  let timer = null;
+
+  // PNG fallback (original three)
+  const FALLBACK_PNGS = [
+    'public/icons/FF-ICON-1.png',
+    'public/icons/FF-ICON-2.png',
+    'public/icons/FF-ICON-3.png'
+  ];
+
+  function ensureContainer(){
+    let el = document.getElementById('spinnerIcon');
+    if(!el) return null;
+
+    // If it's an <img>, replace it with a DIV container we can populate with inline SVG.
+    if(el.tagName === 'IMG'){
+      const div = document.createElement('div');
+      div.id = el.id;
+      div.className = el.className;
+      div.setAttribute('aria-hidden','true');
+      el.replaceWith(div);
+      el = div;
+    }
+    return el;
+  }
+
+  async function tryLoadManifest(){
+    try{
+      const res = await fetch(CONFIG.ANIM_ICON_DIR + 'manifest.json', { cache:'no-store' });
+      if(!res.ok) throw new Error('no manifest');
+      const arr = await res.json();
+      if(Array.isArray(arr) && arr.length){
+        icons = arr.map(name => CONFIG.ANIM_ICON_DIR + String(name));
+        return true;
+      }
+    }catch(_){ /* ignore */ }
+    return false;
+  }
+
+  // Guess names like anim-001.svg ... anim-300.svg etc. We don't probe all upfront:
+  // each tick we try a random guess until we find one that exists, then cache it.
+  function guessIconName(idx){
+    for(const pat of CONFIG.ANIM_ICON_PATTERNS){
+      const name = pat(idx);
+      if(name) return CONFIG.ANIM_ICON_DIR + name;
+    }
+    return null;
+  }
+
+  async function exists(url){
+    try{
+      // Use fetch to get text (we need the SVG markup anyway when used)
+      const res = await fetch(url, { cache:'no-store' });
+      if(!res.ok) return null;
+      const text = await res.text();
+      return text;
+    }catch(_){ return null; }
+  }
+
+  function getThemeAccents(){
+    // Pull from CSS vars and create subtle variations
+    const base = [
+      cssVar('--forest-400') || '#21a06a',
+      cssVar('--forest-500') || '#1a7a52',
+      cssVar('--forest-600') || '#146045',
+    ].filter(Boolean);
+
+    // Add lighter/darker tweaks
+    const expanded = [];
+    base.forEach(hex=>{
+      expanded.push(hex, tweakLightness(hex, +8), tweakLightness(hex, -8));
+    });
+    return expanded;
+  }
+
+  function setAccent(hex){
+    document.documentElement.style.setProperty('--spinner-accent', hex);
+    const ring = document.querySelector('.spinner-ring');
+    if(ring){
+      ring.style.borderTopColor = hex;
+      // give subtle variance for the right side so the spin looks nicer
+      ring.style.borderRightColor = tweakLightness(hex, -12);
+    }
+    const iconWrap = document.getElementById('spinnerIcon');
+    if(iconWrap){
+      iconWrap.style.color = hex;
+    }
+  }
+
+  function nextFromPool(pool, refillSource){
+    if(pool.length === 0) pool.push(...shuffle([...refillSource]));
+    return pool.pop();
+  }
+
+  function setCopy(indexSeed=0){
+    const quipEl = document.querySelector('#loading .spinner-copy .quip');
+    const hintEl = document.querySelector('#loading .spinner-copy .hint');
+
+    const quip = nextFromPool(quipPool, FUN_QUIPS);
+    const hint = nextFromPool(hintPool, FUN_HINTS);
+
+    if(quipEl){
+      quipEl.innerHTML = `${quip} <span class="dots"><span>•</span><span>•</span><span>•</span></span>`;
+    }
+    if(hintEl){
+      hintEl.textContent = hint;
+    }
+  }
+
+  function colorizeSvgMarkup(svgText){
+    // Force fills & strokes to currentColor so we can tint via CSS.
+    let txt = svgText;
+
+    // If the root <svg> lacks width/height, let CSS handle.
+    // Replace any hardcoded fill/stroke values (except 'none') with currentColor.
+    txt = txt.replace(/fill="(?!none)[^"]*"/gi, 'fill="currentColor"');
+    txt = txt.replace(/stroke="(?!none)[^"]*"/gi, 'stroke="currentColor"');
+
+    // Remove inline styles that hardcode colors, gently
+    txt = txt.replace(/style="[^"]*"/gi, (m)=>{
+      const cleaned = m
+        .replace(/fill:\s*(?!none)[#a-z0-9().,\s-]+;?/gi, '')
+        .replace(/stroke:\s*(?!none)[#a-z0-9().,\s-]+;?/gi, '');
+      return cleaned === 'style=""' ? '' : cleaned;
+    });
+
+    return txt;
+  }
+
+  async function setIcon(){
+    const wrap = ensureContainer();
+    if(!wrap) return;
+
+    const accents = getThemeAccents();
+    const picked = accents[rand(accents.length)];
+    setAccent(picked);
+
+    // If we have a manifest list already, pick from there
+    if(icons.length){
+      const url = icons[rand(icons.length)];
+      const text = await exists(url);
+      if(text){
+        wrap.innerHTML = colorizeSvgMarkup(text);
+        return;
+      }
+    }
+
+    // Otherwise, guess filenames until one works (at most a few tries each tick)
+    if(!triedGuesses){ triedGuesses = true; }
+    for(let tries=0; tries<5; tries++){
+      const guess = guessIconName(1 + rand(300)); // you said ~300 svgs
+      if(!guess) continue;
+      const text = await exists(guess);
+      if(text){
+        // cache this discovered icon
+        icons.push(guess);
+        wrap.innerHTML = colorizeSvgMarkup(text);
+        return;
+      }
+    }
+
+    // Last resort: use a PNG fallback (rotate)
+    const png = FALLBACK_PNGS[rand(FALLBACK_PNGS.length)];
+    wrap.innerHTML = `<img alt="Loading" src="${png}">`;
+  }
+
+  async function tick(){
+    setCopy();
+    await setIcon();
+  }
+
+  return {
+    async init(){
+      ensureContainer();
+      // Try manifest in the background (non-blocking for first paint)
+      tryLoadManifest();
+      // First paint immediately
+      tick();
+      // Then rotate
+      clearInterval(timer);
+      timer = setInterval(tick, CONFIG.SPINNER_INTERVAL_MS);
+    }
+  };
+})();
+
