@@ -1,3 +1,4 @@
+// ---------- Tweakable constants ----------
 const CONFIG = {
   PAGE_SIZES_MM: { A4: { W: 210, H: 297 }, A3: { W: 297, H: 420 } },
   DEFAULT_PAGE: 'A4',
@@ -10,6 +11,7 @@ const CONFIG = {
     STROKE_PX: 1.2,
     COLOR: '#00ff00'
   },
+  // default card back (used when a card has no dedicated back)
   BACK_IMAGE_URL: 'https://cdn.imgchest.com/files/7kzcajvdwp7.png',
   CANVAS_DPI: 96,
 
@@ -21,254 +23,45 @@ const CONFIG = {
    */
   BACK_FLIP_MODE: 'long',
 
-  // Spinner animation assets (JSON + SVG icons)
-  ANIM_ICON_DIR: '/public/icons/animation/',
-  ANIM_ICON_MANIFEST: '/public/icons/animation/manifest.json',
-  LOADING_TEXT_URL: '/public/strings/loading.json',
+  // extra bleed beyond the OUTERMOST end of each cutline (in mm)
+  BLEED_EXTRA_MM: 0.5
+};
+// ----------------------------------------
 
-  // fallback if manifest can't be read:
-  ANIM_FALLBACK_COUNT: 300,
-  ANIM_FALLBACK_PATTERN: (n) => `icon-animation-${n}.svg`,
+const ICONS = {
+  flip: '\uf021',   // refresh
+  plus: '\uf067',   // +
+  minus: '\uf068',  // –
+  close: '\uf00d'   // X
+};
 
-  // spinner rotation (ms)
-  SPINNER_ROTATE_MS: 5000
+const SPINNER = {
+  COUNT: 300, // icon-animation-1.svg .. icon-animation-300.svg
+  PATH: (i) => `public/icons/animation/icon-animation-${i}.svg`,
+  LOADING_JSON_URL: 'public/strings/loading.json',
+  COLORS: [
+    '#21a06a', '#1a7a52', '#146045', '#0f3d2e', '#0d3123',
+    '#2cd39a', '#7dd3b0', '#99e2c6' // a few lighter accents
+  ],
+  INTERVAL_MS: 5000
 };
 
 let cachedImages = [];
 let cachedDeckName = "Deck";
 let categoryOrderFromServer = [];
 
-// ================== Small utils ==================
-function clampQty(n) {
-  n = Number.isFinite(+n) ? +n : 0;
-  return Math.max(0, Math.floor(n));
-}
-function shuffle(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = (Math.random() * (i + 1)) | 0;
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-function pathVariants(p) {
-  const norm = String(p).replace(/^\.?\//, "");
-  const noPublic = norm.replace(/^public\//, "");
-  return [norm, "/" + norm, noPublic, "/" + noPublic];
-}
-async function tryFetchAny(urls, opts) {
-  for (const u of urls) {
-    try {
-      const res = await fetch(u, opts);
-      console.log(`[fetch] ${u} → ${res.status}`);
-      if (res.ok) return { url: u, res };
-    } catch (e) {
-      console.warn(`[fetch] ${u} → error`, e);
-    }
-  }
-  return null;
-}
-function escapeHTML(s) {
-  return String(s).replace(/[&<>"']/g, c => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  })[c]);
-}
-function cssEscape(s) {
-  if (window.CSS && CSS.escape) return CSS.escape(s);
-  return String(s).replace(/["\\#.:?[\]()]/g, '\\$&');
-}
-function extractDeckUrl(url) { return url.trim(); }
+let loadingQuips = [
+  'Summoning proxies', 'Shuffling decklists', 'Fetching art & frames',
+  'Consulting the oracle', 'Calibrating printers'
+];
+let loadingHints = [
+  'We’re scraping your deck — bigger decks can take a bit longer.',
+  'Counting card quantities & images — hang tight!',
+  'Optimizing images for crisp print — almost there.'
+];
 
-// ================== Spinner / Loading overlay ==================
-const SpinnerAnimator = (() => {
-  let icons = [];             // full URLs to SVGs
-  let iconIndex = 0;
-  let quipPool = [];
-  let hintPool = [];
-  let quipIndex = 0;
-  let hintIndex = 0;
-  let timer = null;
-
-  // DOM refs (filled by init)
-  let ringEl = null;          // .spinner-ring
-  let iconHost = null;        // #spinnerIcon (we'll ensure it's a <div>)
-  let quipEl = null;          // #loading .quip
-  let hintEl = null;          // #loading .hint
-
-  function themePalette() {
-    const cs = getComputedStyle(document.documentElement);
-    const pick = (name, def) => (cs.getPropertyValue(name) || def).trim() || def;
-    const c400 = pick('--forest-400', '#21a06a');
-    const c500 = pick('--forest-500', '#1a7a52');
-    const c600 = pick('--forest-600', '#146045');
-    return [c400, c500, c600];
-  }
-
-  function normalizeSVGColors(svgText) {
-    try {
-      return svgText
-        .replace(/fill="[^"]*"/gi, 'fill="currentColor"')
-        .replace(/stroke="[^"]*"/gi, 'stroke="currentColor"');
-    } catch {
-      return svgText;
-    }
-  }
-
-  function ensureDivHost() {
-    const el = document.getElementById('spinnerIcon');
-    if (!el) return null;
-    if (el.tagName.toLowerCase() === 'img') {
-      const div = document.createElement('div');
-      div.id = el.id;
-      div.className = el.className || 'spinner-icon';
-      div.setAttribute('aria-hidden', 'true');
-      el.replaceWith(div);
-      return div;
-    }
-    return el;
-  }
-
-  async function loadManifest() {
-    try{
-      const candidates = pathVariants(CONFIG.ANIM_ICON_MANIFEST);
-      console.log("[manifest] candidates:", candidates);
-      const hit = await tryFetchAny(candidates, { cache: "no-store" });
-      if (!hit) throw new Error("manifest not found via any candidate");
-
-      const arr = await hit.res.json();
-      console.log("[manifest] using:", hit.url, "items:", Array.isArray(arr) ? arr.length : typeof arr);
-
-      let files = [];
-      if (Array.isArray(arr)) {
-        if (typeof arr[0] === "string") {
-          files = arr.filter(x => typeof x === "string" && /\.svg$/i.test(x));
-        } else if (typeof arr[0] === "object" && arr[0]) {
-          files = arr
-            .map(o => o.album || o.file || o.filename || o.name)
-            .filter(v => typeof v === "string" && /\.svg$/i.test(v));
-        }
-      }
-
-      const seen = new Set();
-      icons = files
-        .filter(f => !seen.has(f.toLowerCase()) && seen.add(f.toLowerCase()))
-        .map(f => CONFIG.ANIM_ICON_DIR + f);
-
-      if (!icons.length) {
-        console.warn("[manifest] parsed but no .svg entries found; falling back to generated list");
-        const N = CONFIG.ANIM_FALLBACK_COUNT || 300;
-        icons = Array.from({length: N}, (_, i) => CONFIG.ANIM_ICON_DIR + CONFIG.ANIM_FALLBACK_PATTERN(i+1));
-      }
-    } catch (e) {
-      console.warn("[manifest] failed; falling back to generated icon list:", e);
-      const N = CONFIG.ANIM_FALLBACK_COUNT || 300;
-      icons = Array.from({length: N}, (_, i) => CONFIG.ANIM_ICON_DIR + CONFIG.ANIM_FALLBACK_PATTERN(i+1));
-    }
-  }
-
-  async function loadStrings() {
-    try{
-      const candidates = pathVariants(CONFIG.LOADING_TEXT_URL);
-      console.log("[strings] candidates:", candidates);
-      const hit = await tryFetchAny(candidates, { cache: "no-store" });
-      if (!hit) throw new Error("strings not found via any candidate");
-
-      const json = await hit.res.json();
-      console.log("[strings] using:", hit.url);
-
-      const quips = Array.isArray(json.quips) ? json.quips : [];
-      const hints = Array.isArray(json.hints) ? json.hints : [];
-      quipPool = shuffle([...quips]);
-      hintPool = shuffle([...hints]);
-      quipIndex = 0; hintIndex = 0;
-
-      applyText();
-    } catch(e) {
-      console.warn("[strings] failed, using defaults:", e);
-      quipPool = shuffle([
-        "Summoning proxies","Shuffling decklists","Fetching art & frames"
-      ]);
-      hintPool = shuffle([
-        "We’re scraping your Archidekt/Moxfield deck — bigger decks can take a bit longer.",
-        "Counting card quantities & images — hang tight!",
-        "Optimizing images for crisp print — almost there."
-      ]);
-      quipIndex = 0; hintIndex = 0;
-      applyText();
-    }
-  }
-
-  function applyText() {
-    if (quipEl && quipPool.length) {
-      const q = quipPool[quipIndex % quipPool.length];
-      quipEl.innerHTML = `${escapeHTML(q)} <span class="dots"><span>•</span><span>•</span><span>•</span></span>`;
-    }
-    if (hintEl && hintPool.length) {
-      const h = hintPool[hintIndex % hintPool.length];
-      hintEl.textContent = h;
-    }
-  }
-
-  async function swapIcon() {
-    if (!icons.length || !iconHost) return;
-
-    if (iconIndex === 0) {
-      icons = shuffle(icons);
-    }
-    const url = icons[iconIndex % icons.length];
-    iconIndex++;
-
-    const palette = themePalette();
-    const color = palette[(Math.random() * palette.length) | 0];
-
-    try {
-      const res = await fetch(url, { cache: 'no-store' });
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-      let svgText = await res.text();
-      svgText = normalizeSVGColors(svgText);
-
-      iconHost.innerHTML = svgText;
-      const svg = iconHost.querySelector('svg');
-      if (svg) {
-        svg.setAttribute('aria-hidden', 'true');
-        svg.style.display = 'block';
-        svg.style.width = '46px';
-        svg.style.height = '46px';
-        svg.style.color = color;
-        svg.style.fill = 'currentColor';
-        svg.style.stroke = 'currentColor';
-      }
-      if (ringEl) {
-        ringEl.style.borderTopColor = color;
-      }
-    } catch (e) {
-      console.warn('[spinner] failed to load icon', url, e);
-    }
-  }
-
-  function tick() {
-    swapIcon();
-    quipIndex++;
-    hintIndex++;
-    applyText();
-  }
-
-  async function init() {
-    ringEl = document.querySelector('#loading .spinner-ring');
-    iconHost = ensureDivHost();
-    quipEl = document.querySelector('#loading .spinner-copy .quip');
-    hintEl = document.querySelector('#loading .spinner-copy .hint');
-
-    await Promise.all([loadManifest(), loadStrings()]);
-    await swapIcon();
-    applyText();
-
-    clearInterval(timer);
-    timer = setInterval(tick, CONFIG.SPINNER_ROTATE_MS);
-  }
-
-  return { init, tick };
-})();
+let spinnerTimer = null;
+let currentSpinnerIndex = 1;
 
 // =============== Boot ===============
 document.addEventListener('DOMContentLoaded', () => {
@@ -286,7 +79,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  SpinnerAnimator.init().catch(e => console.warn('Spinner init failed', e));
+  // Boot the spinner (icon + text)
+  initLoadingAssets();
 });
 
 // =============== Totals Bar (UI) ===============
@@ -307,6 +101,7 @@ function ensureTotalsBar() {
 
   updateTotalsBar();
 }
+
 function getTotals() {
   let total = 0;
   let zeroed = 0;
@@ -317,6 +112,7 @@ function getTotals() {
   }
   return { total, zeroed };
 }
+
 function updateTotalsBar() {
   const { total, zeroed } = getTotals();
   const totalEl = document.getElementById('totalCount');
@@ -325,10 +121,16 @@ function updateTotalsBar() {
   if (zeroEl) zeroEl.textContent = String(zeroed);
 }
 
-// =============== Quantity helpers ===============
+// =============== Helpers ===============
+function clampQty(n) {
+  n = Number.isFinite(+n) ? +n : 0;
+  return Math.max(0, Math.floor(n));
+}
+
 function applyZeroStateClass(tile, qty) {
   tile?.classList.toggle('is-zero', qty === 0);
 }
+
 function setCardQuantity(index, qty) {
   if (!cachedImages[index]) return;
   const newQty = clampQty(qty);
@@ -345,6 +147,7 @@ function setCardQuantity(index, qty) {
   updateTotalsBar();
   updateCategoryCounts();
 
+  // sync modal if open
   const controls = document.querySelector('.preview-controls');
   const modalQty = document.querySelector('.preview-controls .qty-display');
   if (controls && Number(controls?.dataset.index) === index && modalQty) {
@@ -352,7 +155,9 @@ function setCardQuantity(index, qty) {
   }
 }
 
-// =============== Grouping & Overview ===============
+function extractDeckUrl(url) { return url.trim(); }
+
+// Group by category (preserve server order if provided)
 function groupByCategory(cards) {
   const groups = new Map();
   const order = [];
@@ -381,39 +186,14 @@ function groupByCategory(cards) {
 
   return order.map(cat => [cat, groups.get(cat)]);
 }
+
 function countsForCategory(cards) {
   const uniqueCount = cards.length;
   const copyCount = cards.reduce((sum, c) => sum + clampQty(c.quantity ?? 0), 0);
   return { uniqueCount, copyCount };
 }
 
-// Font Awesome glyphs (shown via CSS ::before)
-const GLYPH = {
-  FLIP: "\uf021",   // refresh
-  PLUS: "\uf067",   // +
-  MINUS: "\uf068",  // −
-  CLOSE: "\uf00d"   // ×
-};
-
-// Render a single glyph via data-icon (prevents double text)
-function applyGlyph(el, glyph) {
-  if (!el) return el;
-  el.classList.add('icon-glyph');
-  el.textContent = '';
-  el.setAttribute('data-icon', glyph);
-  return el;
-}
-
-function makeGlyphButton({ className, title, aria, glyph }) {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = className;
-  if (title) btn.title = title;
-  if (aria) btn.setAttribute('aria-label', aria);
-  applyGlyph(btn, glyph);
-  return btn;
-}
-
+// =============== Overview (categories) ===============
 function renderOverviewGrid() {
   const grid = document.getElementById('cardGrid');
   grid.className = 'categories-wrap';
@@ -426,7 +206,7 @@ function renderOverviewGrid() {
 
     const section = document.createElement('section');
     section.className = 'category-section';
-    section.dataset.category = category;
+    section.dataset.category = category; // default OPEN
 
     const header = document.createElement('div');
     header.className = 'category-title';
@@ -438,15 +218,16 @@ function renderOverviewGrid() {
     left.setAttribute('aria-expanded', 'true');
 
     const indicator = document.createElement('span');
-    indicator.className = 'category-indicator';
-    applyGlyph(indicator, GLYPH.MINUS); // expanded by default
+    indicator.className = 'category-indicator icon-glyph';
+    indicator.setAttribute('aria-hidden', 'true');
+    indicator.dataset.icon = ICONS.minus; // open by default
 
-    const nameEl = document.createElement('span');
-    nameEl.className = 'category-name';
-    nameEl.textContent = category;
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'category-name';
+    nameSpan.textContent = category;
 
     left.appendChild(indicator);
-    left.appendChild(nameEl);
+    left.appendChild(nameSpan);
 
     const meta = document.createElement('span');
     meta.className = 'category-meta';
@@ -472,6 +253,7 @@ function renderOverviewGrid() {
       tile.dataset.index = String(i);
       if (card.backImg) tile.classList.add('has-back');
 
+      // init per-card face view (front by default)
       if (typeof card._showBack !== 'boolean') card._showBack = false;
 
       const qty = clampQty(card.quantity ?? 1);
@@ -481,17 +263,19 @@ function renderOverviewGrid() {
       img.src = card._showBack && card.backImg ? card.backImg : card.img;
       img.alt = card.name ?? 'Card';
 
+      // quantity badge (always visible)
       const badge = document.createElement('span');
       badge.className = 'qty-badge';
       badge.textContent = `×${qty}`;
 
+      // flip badge (DFC only)
       if (card.backImg) {
-        const flip = makeGlyphButton({
-          className: 'flip-badge',
-          title: 'Flip card face',
-          aria: `Flip ${card.name}`,
-          glyph: GLYPH.FLIP
-        });
+        const flip = document.createElement('button');
+        flip.type = 'button';
+        flip.className = 'flip-badge icon-glyph';
+        flip.title = 'Flip card face';
+        flip.setAttribute('aria-label', `Flip ${card.name}`);
+        flip.dataset.icon = ICONS.flip;
         flip.addEventListener('click', (e) => {
           e.stopPropagation();
           card._showBack = !card._showBack;
@@ -504,6 +288,8 @@ function renderOverviewGrid() {
       }
 
       applyZeroStateClass(tile, qty);
+
+      // Open modal on click
       tile.addEventListener('click', () => openPreviewModal(i));
 
       tile.appendChild(img);
@@ -514,12 +300,14 @@ function renderOverviewGrid() {
     section.appendChild(wrap);
     grid.appendChild(section);
 
+    // Collapsible behavior (default open)
     function toggleSection() {
       const isCollapsed = section.classList.toggle('collapsed');
       wrap.style.display = isCollapsed ? 'none' : '';
       left.setAttribute('aria-expanded', String(!isCollapsed));
-      applyGlyph(indicator, isCollapsed ? GLYPH.PLUS : GLYPH.MINUS);
+      indicator.dataset.icon = isCollapsed ? ICONS.plus : ICONS.minus;
     }
+
     left.addEventListener('click', toggleSection);
     left.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -529,6 +317,7 @@ function renderOverviewGrid() {
     });
   });
 }
+
 function updateCategoryCounts() {
   const grouped = groupByCategory(cachedImages);
   grouped.forEach(([category, cards]) => {
@@ -541,6 +330,12 @@ function updateCategoryCounts() {
     if (uniquesEl) uniquesEl.textContent = `${uniqueCount} unique`;
     if (countEl) countEl.textContent = `${copyCount}`;
   });
+}
+
+// Escapers
+function cssEscape(s) {
+  if (window.CSS && CSS.escape) return CSS.escape(s);
+  return String(s).replace(/["\\#.:?[\]()]/g, '\\$&');
 }
 
 // =============== Load deck ===============
@@ -582,6 +377,7 @@ async function loadDeck() {
 
     categoryOrderFromServer = Array.isArray(data.categoryOrder) ? data.categoryOrder : [];
 
+    // keep category, quantities and DFC backImg; init face state
     cachedImages = data.images.map((card, i) => ({
       ...card,
       quantity: clampQty(card.quantity ?? 1),
@@ -611,6 +407,7 @@ function computeGridDims(pageWmm, pageHmm, cardWmm, cardHmm, gapmm) {
   const rows = Math.max(1, Math.floor((pageHmm + gapmm) / (cardHmm + gapmm)));
   return { cols, rows };
 }
+
 function choosePageGeometry(sizeKey, gapmm) {
   const base = CONFIG.PAGE_SIZES_MM[sizeKey];
   let portrait = { W: base.W, H: base.H, orient: 'portrait' };
@@ -623,6 +420,7 @@ function choosePageGeometry(sizeKey, gapmm) {
   const b = computeGridDims(landscape.W, landscape.H, CONFIG.CARD_MM.W, CONFIG.CARD_MM.H, gapmm);
   return (b.cols * b.rows) > (a.cols * a.rows) ? landscape : portrait;
 }
+
 function mapBackIndex(k, cols, rows, flipMode) {
   const r = Math.floor(k / cols);
   const c = k % cols;
@@ -667,6 +465,7 @@ function openPrintView() {
   const CANVAS_W_PX = Math.round((PAGE_W / MM_PER_IN) * CONFIG.CANVAS_DPI);
   const CANVAS_H_PX = Math.round((PAGE_H / MM_PER_IN) * CONFIG.CANVAS_DPI);
 
+  // Flatten to {front, back}; DFCs use backImg; singles use custom back
   const itemsAll = [];
   cachedImages.forEach(card => {
     const q = clampQty(card.quantity);
@@ -685,11 +484,16 @@ function openPrintView() {
     showCutlines ? '(cutlines)' : '(no cutlines)',
     addSpaceBetween ? `(${GAP}mm gaps)` : '(tight)',
     addBackground ? '(backs aligned)' : '',
-    useBlackBg ? '(black page bg panel)' : ''
+    useBlackBg ? '(dark bleed)' : '(light bleed)'
   ].filter(Boolean);
   const title = titleBits.join(' ');
 
   const win = window.open('', '_blank');
+
+  // ---- Bleed geometry (0.5mm past the OUTER end of each cutline) ----
+  const BLEED_MM =
+    CONFIG.CUTLINE.OFFSET_FROM_EDGE_MM + CONFIG.CUTLINE.LENGTH_MM + CONFIG.BLEED_EXTRA_MM;
+  const BLEED_COLOR = useBlackBg ? '#000000' : '#ffffff';
 
   function buildFrontSlotsHTML(items, perPage) {
     const slots = new Array(perPage).fill(null);
@@ -697,8 +501,13 @@ function openPrintView() {
       slots[i] = items[i].front;
     }
     return slots.map(src => src
-      ? `<div class="slot"><img src="${src}" alt="Card front" /></div>`
-      : `<div class="slot empty"></div>`
+      ? `<div class="slot" style="--bleed:${BLEED_MM}mm; --bleed-color:${BLEED_COLOR};">
+           <div class="bleed"></div>
+           <img src="${src}" alt="Card front" />
+         </div>`
+      : `<div class="slot" style="--bleed:${BLEED_MM}mm; --bleed-color:${BLEED_COLOR};">
+           <div class="bleed"></div>
+         </div>`
     ).join('');
   }
 
@@ -709,8 +518,13 @@ function openPrintView() {
       slots[idxBack] = items[k].back;
     }
     return slots.map(src => src
-      ? `<div class="slot"><img src="${src}" alt="Card back" /></div>`
-      : `<div class="slot empty"></div>`
+      ? `<div class="slot" style="--bleed:${BLEED_MM}mm; --bleed-color:${BLEED_COLOR};">
+           <div class="bleed"></div>
+           <img src="${src}" alt="Card back" />
+         </div>`
+      : `<div class="slot" style="--bleed:${BLEED_MM}mm; --bleed-color:${BLEED_COLOR};">
+           <div class="bleed"></div>
+         </div>`
     ).join('');
   }
 
@@ -773,8 +587,31 @@ function openPrintView() {
           font-family: system-ui, Segoe UI, Roboto, Inter, Arial, sans-serif;
         }
         .sheet { position: absolute; }
-        .sheet .slot { width: ${CONFIG.CARD_MM.W}mm; height: ${CONFIG.CARD_MM.H}mm; display: block; position: relative; overflow: hidden; }
-        .sheet .slot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        /* Allow bleed to extend outside the card cell */
+        .sheet .slot {
+          width: ${CONFIG.CARD_MM.W}mm;
+          height: ${CONFIG.CARD_MM.H}mm;
+          position: relative;
+          display: block;
+          overflow: visible;        /* was hidden — must be visible for bleed */
+        }
+        .sheet .slot .bleed {
+          position: absolute;
+          left: calc(-1 * var(--bleed));
+          top:  calc(-1 * var(--bleed));
+          width:  calc(100% + var(--bleed) * 2);
+          height: calc(100% + var(--bleed) * 2);
+          background: var(--bleed-color);
+          z-index: 0;
+        }
+        .sheet .slot img {
+          position: relative;
+          z-index: 1;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
       </style>
     </head>
     <body>
@@ -782,7 +619,6 @@ function openPrintView() {
       <script>
         document.title = ${JSON.stringify(title)};
 
-        const USE_BLACK_BG = ${useBlackBg ? 'true' : 'false'};
         const OFFSET_MM = ${CONFIG.CUTLINE.OFFSET_FROM_EDGE_MM};
         const LENGTH_MM = ${CONFIG.CUTLINE.LENGTH_MM};
         const STROKE_PX = ${CONFIG.CUTLINE.STROKE_PX};
@@ -797,14 +633,6 @@ function openPrintView() {
         const GRID_ROWS = ${GRID_ROWS};
         const MARGIN_L = ${MARGIN_L};
         const MARGIN_T = ${MARGIN_T};
-
-        document.querySelectorAll('.page-fill').forEach(canvas => {
-          const ctx = canvas.getContext('2d');
-          if (USE_BLACK_BG) {
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-          }
-        });
 
         function drawCornerMarks(ctx, x, y, w, h, pxPerMM_X, pxPerMM_Y) {
           const offX = OFFSET_MM * pxPerMM_X;
@@ -904,26 +732,15 @@ function openPreviewModal(index) {
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
 
+  // use current tile face state as starting point
   let showingBack = !!card._showBack;
-
-  const flipBtnHTML = card.backImg
-    ? (() => {
-        const btn = makeGlyphButton({
-          className: 'preview-flip',
-          title: 'Flip card face',
-          aria: 'Flip card face',
-          glyph: GLYPH.FLIP
-        });
-        return btn.outerHTML;
-      })()
-    : '';
 
   overlay.innerHTML = `
     <div class="preview-card" role="document" aria-label="${escapeHTML(card.name ?? 'Card preview')}">
-      <button class="preview-close" aria-label="Close"></button>
+      <button class="preview-close icon-glyph" aria-label="Close" data-icon="${ICONS.close}"></button>
 
       <div class="preview-image-wrap">
-        ${flipBtnHTML}
+        ${card.backImg ? `<button class="preview-flip icon-glyph" type="button" aria-label="Flip card face" data-icon="${ICONS.flip}"></button>` : ``}
         <img src="${showingBack && card.backImg ? card.backImg : card.img}" alt="${escapeHTML(card.name ?? 'Card')}" />
       </div>
 
@@ -941,37 +758,33 @@ function openPreviewModal(index) {
     </div>
   `;
 
-  // Close button glyph
-  const closeBtn = overlay.querySelector('.preview-close');
-  applyGlyph(closeBtn, GLYPH.CLOSE);
-
   // Close on backdrop
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closePreviewModal(overlay); });
   // Close on X
-  closeBtn?.addEventListener('click', () => closePreviewModal(overlay));
+  overlay.querySelector('.preview-close')?.addEventListener('click', () => closePreviewModal(overlay));
   // ESC
   const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); closePreviewModal(overlay); document.removeEventListener('keydown', onKey); } };
   document.addEventListener('keydown', onKey);
 
   // Flip (modal)
-  const flipBtn = overlay.querySelector('.preview-flip');
-  if (flipBtn && card.backImg) {
-    flipBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      showingBack = !showingBack;
-      card._showBack = showingBack; // sync to overview state
-      const imgEl = overlay.querySelector('.preview-image-wrap img');
-      if (imgEl) imgEl.src = showingBack ? card.backImg : card.img;
+  overlay.querySelector('.preview-flip')?.addEventListener('click', (e) => {
+    if (!card.backImg) return;
+    e.stopPropagation();
+    showingBack = !showingBack;
+    card._showBack = showingBack; // sync to overview state
+    const imgEl = overlay.querySelector('.preview-image-wrap img');
+    if (imgEl) imgEl.src = showingBack ? card.backImg : card.img;
 
-      const tileImg = document.querySelector(`.card[data-index="${index}"] img`);
-      if (tileImg) tileImg.src = showingBack ? card.backImg : card.img;
-      const tile = document.querySelector(`.card[data-index="${index}"]`);
-      tile?.classList.toggle('showing-back', showingBack);
+    // also update the overview tile image immediately
+    const tileImg = document.querySelector(`.card[data-index="${index}"] img`);
+    if (tileImg) tileImg.src = showingBack ? card.backImg : card.img;
+    const tile = document.querySelector(`.card[data-index="${index}"]`);
+    tile?.classList.toggle('showing-back', showingBack);
 
-      flipBtn.classList.add('spin');
-      setTimeout(() => flipBtn.classList.remove('spin'), 500);
-    });
-  }
+    const btn = overlay.querySelector('.preview-flip');
+    btn?.classList.add('spin');
+    setTimeout(() => btn?.classList.remove('spin'), 500);
+  });
 
   // Quantity buttons
   overlay.querySelector('.preview-controls')?.addEventListener('click', (e) => {
@@ -998,11 +811,104 @@ function openPreviewModal(index) {
   });
 
   document.body.appendChild(overlay);
-  closeBtn?.focus();
+  overlay.querySelector('.preview-close')?.focus();
 }
+
 function closePreviewModal(overlayEl) {
   try {
     document.body.classList.remove('modal-open');
     (overlayEl || document.getElementById('previewOverlay'))?.remove();
   } catch (_) {}
+}
+
+// ================= Loading: SVG icon + copy =================
+async function initLoadingAssets() {
+  // load loading copy JSON
+  try {
+    const res = await fetch(SPINNER.LOADING_JSON_URL, { cache: 'no-cache' });
+    if (res.ok) {
+      const data = await res.json();
+      // accept both {quips:[], hints:[]} or {lines:[{quip:"", hint:""}]}
+      if (Array.isArray(data?.quips)) loadingQuips = data.quips;
+      if (Array.isArray(data?.hints)) loadingHints = data.hints;
+      if (Array.isArray(data?.lines)) {
+        loadingQuips = data.lines.map(x => x.quip || '').filter(Boolean);
+        loadingHints = data.lines.map(x => x.hint || '').filter(Boolean);
+      }
+    }
+  } catch (e) {
+    // keep defaults
+    console.warn('Could not load loading.json:', e);
+  }
+
+  // pick a random start index
+  currentSpinnerIndex = 1 + Math.floor(Math.random() * SPINNER.COUNT);
+  await setSpinnerIcon(currentSpinnerIndex);
+
+  // set initial copy
+  updateLoadingCopy(currentSpinnerIndex - 1);
+
+  // cycle icon + copy while overlay is visible
+  clearInterval(spinnerTimer);
+  spinnerTimer = setInterval(async () => {
+    const overlayVisible = !document.getElementById('loading')?.classList.contains('hidden');
+    if (!overlayVisible) return; // don't churn when not visible
+    currentSpinnerIndex = 1 + Math.floor(Math.random() * SPINNER.COUNT);
+    await setSpinnerIcon(currentSpinnerIndex);
+    updateLoadingCopy(currentSpinnerIndex - 1);
+  }, SPINNER.INTERVAL_MS);
+}
+
+async function setSpinnerIcon(index) {
+  const host = document.getElementById('spinnerIcon');
+  if (!host) return;
+  const color = SPINNER.COLORS[Math.floor(Math.random() * SPINNER.COLORS.length)];
+
+  try {
+    const res = await fetch(SPINNER.PATH(index), { cache: 'no-cache' });
+    if (!res.ok) throw new Error('SVG not found');
+    const svg = await res.text();
+
+    // Inject the raw SVG (scoped color via currentColor)
+    host.innerHTML = svg;
+    host.style.width = '46px';
+    host.style.height = '46px';
+    host.style.color = color;
+
+    // If the SVG doesn't use currentColor, try a quick tint for common attributes
+    host.querySelectorAll('svg').forEach(sv => {
+      sv.setAttribute('width', '46');
+      sv.setAttribute('height', '46');
+    });
+    host.querySelectorAll('svg [fill]').forEach(el => {
+      const v = el.getAttribute('fill') || '';
+      if (/^#|rgb|hsl|currentColor/i.test(v)) {
+        if (v.toLowerCase() !== 'none') el.setAttribute('fill', 'currentColor');
+      }
+    });
+    host.querySelectorAll('svg [stroke]').forEach(el => {
+      const v = el.getAttribute('stroke') || '';
+      if (/^#|rgb|hsl|currentColor/i.test(v)) {
+        if (v.toLowerCase() !== 'none') el.setAttribute('stroke', 'currentColor');
+      }
+    });
+  } catch (e) {
+    // graceful fallback: simple emoji
+    host.innerHTML = '🌀';
+    host.style.color = color;
+  }
+}
+
+function updateLoadingCopy(index) {
+  const quipEl = document.querySelector('#loading .spinner-copy .quip');
+  const hintEl = document.querySelector('#loading .spinner-copy .hint');
+  if (quipEl) quipEl.innerHTML = `${(loadingQuips[index % loadingQuips.length]) || 'Loading'} <span class="dots"><span>•</span><span>•</span><span>•</span></span>`;
+  if (hintEl && loadingHints.length) hintEl.textContent = loadingHints[index % loadingHints.length];
+}
+
+// =============== Utilities ===============
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[c]);
 }
