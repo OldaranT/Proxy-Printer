@@ -16,13 +16,13 @@
   --text-dark:#0f1b14;
 
   /* ui */
-  --mint-200:#cfeee0;       /* focus ring */
+  --mint-200:#cfeee0;
   --mint-100:#e9f6f0;
   --stone-100:#f5faf7;
   --stone-200:#e7eee9;
   --stone-300:#c8d6cf;
 
-  /* radii (subtle) */
+  /* radii */
   --radius-ssm:3px;
   --radius-sm:8px;
   --radius-md:10px;
@@ -35,7 +35,7 @@
   --glow-on:0 0 0 6px rgba(33,160,106,.22);
 }
 
-/* ================= Page Background ================= */
+/* ================= Page Background (infinite) ================= */
 body{
   margin:0;
   font-family: system-ui,-apple-system,Segoe UI,Roboto,Inter,Ubuntu,'Helvetica Neue',Arial,sans-serif;
@@ -44,10 +44,7 @@ body{
 }
 body::before{
   content:"";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background:
     radial-gradient(ellipse farthest-corner at 85% -10%,
       rgba(33,160,106,.14) 0%, rgba(33,160,106,0) 60%),
@@ -91,7 +88,8 @@ body::before{
 }
 .btn.sm{height:40px}
 .btn:hover:not(:disabled){
-  transform: translateY(-1px);background:linear-gradient(180deg,var(--forest-500),var(--forest-600));
+  transform: translateY(-1px);
+  background:linear-gradient(180deg,var(--forest-500),var(--forest-600));
   box-shadow: var(--shadow-strong);
 }
 .btn:active{transform: translateY(0)}
@@ -159,15 +157,12 @@ body::before{
 .dots span:nth-child(1){animation-delay:0s}.dots span:nth-child(2){animation-delay:.15s}.dots span:nth-child(3){animation-delay:.30s}
 @keyframes dotBlink{0%,20%{opacity:0;transform:translateY(0)}50%{opacity:1;transform:translateY(-1px)}100%{opacity:0;transform:translateY(0)}
 
-/* ================= Totals Bar (POP!) ================= */
+/* ================= Totals Bar ================= */
 .totals-bar{
   display:flex;align-items:center;gap:12px;margin:14px 0 2px;
-  padding:10px 12px;
-  background: linear-gradient(180deg, #ffffff, #f8fcfa);
-  border:1px solid #dfe7e3;
-  border-left:4px solid var(--forest-500);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-card);
+  padding:10px 12px;background: linear-gradient(180deg, #ffffff, #f8fcfa);
+  border:1px solid #dfe7e3;border-left:4px solid var(--forest-500);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-card);
 }
 .totals-bar .label{font-weight:900;color:#1b3e31;letter-spacing:.2px}
 .totals-bar .value{
@@ -182,37 +177,23 @@ body::before{
 .categories-wrap{display:block}
 .category-section{margin-top:18px}
 
-/* Category header: card-like with accent bar and badges */
 .category-title{
   display:flex;align-items:center;justify-content:space-between;gap:10px;
-  padding:10px 12px;
-  background: linear-gradient(180deg, #ffffff, var(--stone-100));
-  border:1px solid #dfe7e3;
-  border-left:4px solid var(--forest-500);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-card);
+  padding:10px 12px;background: linear-gradient(180deg, #ffffff, var(--stone-100));
+  border:1px solid #dfe7e3;border-left:4px solid var(--forest-500);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-card);
 }
-.category-name{
-  font-weight:900;color:#163b2e;letter-spacing:.2px;
-}
-.category-meta{
-  display:flex;gap:8px;align-items:center;font-weight:800;
-}
-
-/* light badge for uniques */
+.category-name{font-weight:900;color:#163b2e;letter-spacing:.2px}
+.category-meta{display:flex;gap:8px;align-items:center;font-weight:800}
 .category-uniques{
-  color:#1f3f33;background:#eef6f1;border:1px solid #d6e8df;
-  padding:4px 8px;border-radius:10px;
+  color:#1f3f33;background:#eef6f1;border:1px solid #d6e8df;padding:4px 8px;border-radius:10px;
 }
-/* strong badge for total copies */
 .category-count{
   color:#fff;background: linear-gradient(180deg,var(--forest-500),var(--forest-700));
-  border:1px solid rgba(255,255,255,.16);
-  padding:4px 10px;border-radius:10px;
+  border:1px solid rgba(255,255,255,.16);padding:4px 10px;border-radius:10px;
   box-shadow:0 2px 8px rgba(0,0,0,.12), inset 0 0 0 1px rgba(255,255,255,.06);
 }
 
-/* grid of cards under each category */
 .category-grid{
   display:grid;grid-template-columns:repeat(auto-fill, minmax(140px,1fr));
   gap:12px;margin-top:10px;overflow:visible;
@@ -221,9 +202,7 @@ body::before{
 /* ================= Card tiles ================= */
 .card-grid .card,
 .category-grid .card{
-  position:relative;
-  aspect-ratio:63/88;
-  background:#f4f7f5;border:1px solid #e7eee9;border-radius:var(--radius-ssm);
+  position:relative;aspect-ratio:63/88;background:#f4f7f5;border:1px solid #e7eee9;border-radius:var(--radius-ssm);
   overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);
   z-index:0;transform-origin:center center;transition: transform .14s ease, box-shadow .18s ease, z-index 0s;
   cursor:pointer;
@@ -233,12 +212,11 @@ body::before{
   position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:1;
 }
 
-/* Always show the quantity badge; allow multi-digit values */
+/* Always show qty badge; handle 2+ digits */
 .qty-badge{
   position:absolute;z-index:2;right:6px;bottom:6px;
   display:inline-flex;align-items:center;justify-content:center;
-  min-width: 28px;height:22px;padding:0 10px;
-  border-radius: var(--radius-ssm);
+  min-width: 28px;height:22px;padding:0 10px;border-radius: var(--radius-ssm);
   font-size:12px;font-weight:800;line-height:1;color:#fff;white-space:nowrap;
   background: linear-gradient(180deg, var(--forest-500), var(--forest-700));
   border: 1px solid rgba(255,255,255,.18);
@@ -246,7 +224,7 @@ body::before{
   user-select:none;pointer-events:none;
 }
 
-/* Fade cards that are at ×0 (still clickable) */
+/* Fade cards with ×0 (still clickable) */
 .card.is-zero{opacity:.45;filter: grayscale(.1)}
 .card.is-zero .qty-badge{opacity:.85}
 
@@ -269,9 +247,7 @@ body.modal-open{overflow:hidden}
   display:flex;align-items:center;justify-content:center;
 }
 .preview-image-wrap img{max-width:100%;max-height:100%;object-fit:contain;display:block}
-.preview-controls{
-  display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;
-}
+.preview-controls{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
 .qty-btn{
   height:36px;min-width:44px;padding:0 10px;border-radius:8px;border:0;cursor:pointer;
   background:linear-gradient(180deg,var(--forest-600),var(--forest-700));
@@ -284,7 +260,7 @@ body.modal-open{overflow:hidden}
   padding:6px 10px;border:1px solid rgba(255,255,255,.12)
 }
 
-/* ================= Card grid (legacy hook) ================= */
+/* ================= Legacy card-grid hook ================= */
 .card-grid{
   display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
   gap:12px;margin-top:14px;overflow:visible;

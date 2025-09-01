@@ -26,10 +26,10 @@ const CONFIG = {
   CANVAS_DPI: 96,
 
   /**
-   * How to flip backs so they align in duplex printing.
-   * - 'long'  : mirror horizontally (reverse columns) → “Flip on long edge”
-   * - 'short' : mirror vertically   (reverse rows)    → “Flip on short edge”
-   * - 'none'  : no mirroring
+   * Duplex flip mode for back-page mirroring
+   * 'long'  → reverse columns (Flip on long edge)
+   * 'short' → reverse rows   (Flip on short edge)
+   * 'none'  → no mirroring
    */
   BACK_FLIP_MODE: 'long'
 };
@@ -37,12 +37,12 @@ const CONFIG = {
 
 let cachedImages = [];
 let cachedDeckName = "Deck";
-let categoryOrderFromServer = []; // optional order hint from server
+let categoryOrderFromServer = [];
 
 document.addEventListener('DOMContentLoaded', () => {
   ensureTotalsBar();
 
-  // Fallback for :has() styles in CSS (older browsers)
+  // Fallback for :has() in older browsers (keeps toggles looking correct)
   const supportsHas = CSS.supports?.('selector(:has(*))');
   if (!supportsHas) {
     document.querySelectorAll('.toggle').forEach(toggle => {
@@ -121,7 +121,7 @@ function setCardQuantity(index, qty) {
   updateTotalsBar();
   updateCategoryCounts();
 
-  // keep modal display in sync if open
+  // sync modal if open
   const controls = document.querySelector('.preview-controls');
   const modalQty = document.querySelector('.preview-controls .qty-display');
   if (controls && Number(controls?.dataset.index) === index && modalQty) {
@@ -133,7 +133,7 @@ function extractDeckUrl(url) {
   return url.trim();
 }
 
-// Group cards by category. Uses server-provided order if available, else first-seen order.
+// Group by category, preserving server order when provided
 function groupByCategory(cards) {
   const groups = new Map();
   const order = [];
@@ -156,9 +156,7 @@ function groupByCategory(cards) {
         seen.add(cat);
       }
     });
-    order.forEach(cat => {
-      if (!seen.has(cat)) ordered.push([cat, groups.get(cat)]);
-    });
+    order.forEach(cat => { if (!seen.has(cat)) ordered.push([cat, groups.get(cat)]); });
     return ordered;
   }
 
@@ -171,7 +169,7 @@ function countsForCategory(cards) {
   return { uniqueCount, copyCount };
 }
 
-// Render overview: vertical (label → cards → next label → cards)
+// Render overview: label → cards → label → cards
 function renderOverviewGrid() {
   const grid = document.getElementById('cardGrid');
 
@@ -219,6 +217,8 @@ function renderOverviewGrid() {
       badge.textContent = `×${qty}`;
 
       applyZeroStateClass(tile, qty);
+
+      // CLICK opens modal
       tile.addEventListener('click', () => openPreviewModal(i));
 
       tile.appendChild(img);
@@ -245,7 +245,7 @@ function updateCategoryCounts() {
   });
 }
 
-// HTML/CSS escapers
+// Escapers
 function escapeHTML(s) {
   return String(s).replace(/[&<>"']/g, c => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
@@ -297,7 +297,7 @@ async function loadDeck() {
 
     categoryOrderFromServer = Array.isArray(data.categoryOrder) ? data.categoryOrder : [];
 
-    // keep category, quantities, and store backImg if present
+    // keep category & quantities; backImg for DFCs (if present)
     cachedImages = data.images.map((card, i) => ({
       ...card,
       quantity: clampQty(card.quantity ?? 1),
@@ -340,26 +340,20 @@ function choosePageGeometry(sizeKey, gapmm) {
   return (b.cols * b.rows) > (a.cols * a.rows) ? landscape : portrait;
 }
 
-/**
- * Map a front index k (0..cols*rows-1) to the slot index for the back page
- * according to duplex flip mode.
- */
 function mapBackIndex(k, cols, rows, flipMode) {
   const r = Math.floor(k / cols);
   const c = k % cols;
   let rr = r, cc = c;
 
   if (flipMode === 'long') {
-    // Mirror horizontally (reverse columns)
     cc = cols - 1 - c;
   } else if (flipMode === 'short') {
-    // Mirror vertically (reverse rows)
     rr = rows - 1 - r;
   }
   return rr * cols + cc;
 }
 
-// Build print pages COMPACTLY — categories do NOT influence layout
+// Build print pages COMPACTLY — categories do NOT affect layout
 function openPrintView() {
   if (!cachedImages.length) return;
 
@@ -392,15 +386,13 @@ function openPrintView() {
   const CANVAS_W_PX = Math.round((PAGE_W / MM_PER_IN) * CONFIG.CANVAS_DPI);
   const CANVAS_H_PX = Math.round((PAGE_H / MM_PER_IN) * CONFIG.CANVAS_DPI);
 
-  // Flatten all selected items with their corresponding backs
+  // Flatten to {front, back} items; DFCs use backImg; singles use custom back
   const itemsAll = [];
   cachedImages.forEach(card => {
     const q = clampQty(card.quantity);
     if (q > 0) {
       const backSrc = card.backImg || CONFIG.BACK_IMAGE_URL;
-      for (let i = 0; i < q; i++) {
-        itemsAll.push({ front: card.img, back: backSrc });
-      }
+      for (let i = 0; i < q; i++) itemsAll.push({ front: card.img, back: backSrc });
     }
   });
 
@@ -434,7 +426,7 @@ function openPrintView() {
     const slots = new Array(perPage).fill(null);
     for (let k = 0; k < Math.min(items.length, perPage); k++) {
       const idxBack = mapBackIndex(k, GRID_COLS, GRID_ROWS, CONFIG.BACK_FLIP_MODE);
-      slots[idxBack] = items[k].back; // DFC uses real back; single-face uses custom back
+      slots[idxBack] = items[k].back;
     }
     return slots.map(src => src
       ? `<div class="slot"><img src="${src}" alt="Card back" /></div>`
@@ -470,7 +462,6 @@ function openPrintView() {
     `;
   }
 
-  // Build compact pages (fronts + aligned backs)
   const pages = [];
   for (let i = 0; i < itemsAll.length; i += perPage) {
     const chunkItems = itemsAll.slice(i, i + perPage);
@@ -644,11 +635,12 @@ function openPreviewModal(index) {
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
 
+  // IMPORTANT: no escaped ${...} — let the values render.
   overlay.innerHTML = `
-    <div class="preview-card" role="document" aria-label="\${card.name ?? 'Card preview'}">
+    <div class="preview-card" role="document" aria-label="${card.name ?? 'Card preview'}">
       <button class="preview-close" aria-label="Close">×</button>
       <div class="preview-image-wrap">
-        <img src="\${card.img}" alt="\${card.name ?? 'Card'}">
+        <img src="${card.img}" alt="${card.name ?? 'Card'}">
       </div>
       <div class="preview-controls" data-index="${index}">
         <button class="qty-btn step minus10" aria-label="Decrease by 10">−10</button>
@@ -662,9 +654,15 @@ function openPreviewModal(index) {
     </div>
   `;
 
+  // Close on outside click
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closePreviewModal(); });
+  // Close on X
   overlay.querySelector('.preview-close').addEventListener('click', closePreviewModal);
+  // Close on ESC
+  const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); closePreviewModal(); } };
+  document.addEventListener('keydown', onKey, { once: true });
 
+  // Quantity buttons
   const controls = overlay.querySelector('.preview-controls');
   controls.addEventListener('click', (e) => {
     const btn = e.target.closest('.qty-btn');
@@ -682,9 +680,6 @@ function openPreviewModal(index) {
     const next = Math.max(0, current + delta);
     setCardQuantity(idx, next);
   });
-
-  const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); closePreviewModal(); } };
-  document.addEventListener('keydown', onKey, { once: true });
 
   document.body.appendChild(overlay);
   overlay.querySelector('.preview-close').focus();
