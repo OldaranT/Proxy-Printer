@@ -1,39 +1,23 @@
-// script.js
-
 // ---------- Tweakable constants ----------
 const CONFIG = {
-  // Supported page sizes (portrait dimensions, in mm)
   PAGE_SIZES_MM: { A4: { W: 210, H: 297 }, A3: { W: 297, H: 420 } },
-  DEFAULT_PAGE: 'A4',                   // used when pageSize toggle is OFF
-
-  // Auto orientation picks portrait/landscape to maximize #cards per page.
-  // Options: 'auto' | 'portrait' | 'landscape'
-  ORIENTATION_MODE: 'auto',
-
-  // Card geometry (mm)
+  DEFAULT_PAGE: 'A4',
+  ORIENTATION_MODE: 'auto',           // 'auto' | 'portrait' | 'landscape'
   CARD_MM: { W: 63, H: 88 },
-
-  // Spacing between cards when enabled (mm)
   GAP_WHEN_ENABLED_MM: 6,
-
-  // Cutline (corner crop marks) styling
   CUTLINE: {
-    OFFSET_FROM_EDGE_MM: 0.5,          // gap from card edge to start of crop mark
-    LENGTH_MM: 2,                       // crop mark line length
-    STROKE_PX: 1.2,                     // stroke width (canvas pixels)
-    COLOR: '#00ff00'                    // crop mark color
+    OFFSET_FROM_EDGE_MM: 0.5,
+    LENGTH_MM: 2,
+    STROKE_PX: 1.2,
+    COLOR: '#00ff00'
   },
-
-  // Back image for single-faced cards
   BACK_IMAGE_URL: 'https://cdn.imgchest.com/files/7kzcajvdwp7.png',
-
-  // Canvas pixel density for cutline/background canvases
   CANVAS_DPI: 96,
 
   /**
-   * Duplex flip mode for the backs page
-   * 'long'  → reverse columns (flip on long edge)
-   * 'short' → reverse rows   (flip on short edge)
+   * Duplex flip mode:
+   * 'long'  → mirror columns (flip on long edge)
+   * 'short' → mirror rows   (flip on short edge)
    * 'none'  → no mirroring
    */
   BACK_FLIP_MODE: 'long'
@@ -48,7 +32,7 @@ let categoryOrderFromServer = [];
 document.addEventListener('DOMContentLoaded', () => {
   ensureTotalsBar();
 
-  // Fallback for :has() in older browsers (keeps toggles looking correct)
+  // Fallback for :has() so toggles still look right in older browsers
   const supportsHas = CSS.supports?.('selector(:has(*))');
   if (!supportsHas) {
     document.querySelectorAll('.toggle').forEach(toggle => {
@@ -135,7 +119,7 @@ function setCardQuantity(index, qty) {
 
 function extractDeckUrl(url) { return url.trim(); }
 
-// Group by category, preserving server order when provided
+// Group by category (preserve server order if provided)
 function groupByCategory(cards) {
   const groups = new Map();
   const order = [];
@@ -171,7 +155,7 @@ function countsForCategory(cards) {
   return { uniqueCount, copyCount };
 }
 
-// Render overview: label → cards; categories DO NOT affect printing layout
+// =============== Overview (categories) ===============
 function renderOverviewGrid() {
   const grid = document.getElementById('cardGrid');
   grid.className = 'categories-wrap';
@@ -205,17 +189,39 @@ function renderOverviewGrid() {
       const tile = document.createElement('div');
       tile.className = 'card';
       tile.dataset.index = String(i);
+      if (card.backImg) tile.classList.add('has-back');
+
+      // init per-card face view (front by default)
+      if (typeof card._showBack !== 'boolean') card._showBack = false;
 
       const qty = clampQty(card.quantity ?? 1);
       tile.setAttribute('aria-label', `${card.name} – quantity ${qty}`);
 
       const img = document.createElement('img');
-      img.src = card.img;
+      img.src = card._showBack && card.backImg ? card.backImg : card.img;
       img.alt = card.name ?? 'Card';
 
+      // quantity badge (always visible, multi-digit supported)
       const badge = document.createElement('span');
       badge.className = 'qty-badge';
       badge.textContent = `×${qty}`;
+
+      // flip badge (DFC only)
+      if (card.backImg) {
+        const flip = document.createElement('button');
+        flip.type = 'button';
+        flip.className = 'flip-badge';
+        flip.title = 'Flip card face';
+        flip.setAttribute('aria-label', `Flip ${card.name}`);
+        flip.textContent = 'Flip';
+        flip.addEventListener('click', (e) => {
+          e.stopPropagation();
+          card._showBack = !card._showBack;
+          img.src = card._showBack ? card.backImg : card.img;
+          tile.classList.toggle('showing-back', !!card._showBack);
+        });
+        tile.appendChild(flip);
+      }
 
       applyZeroStateClass(tile, qty);
 
@@ -296,13 +302,14 @@ async function loadDeck() {
 
     categoryOrderFromServer = Array.isArray(data.categoryOrder) ? data.categoryOrder : [];
 
-    // keep category & quantities; backImg for DFCs (if present)
+    // keep category, quantities and DFC backImg; init face state
     cachedImages = data.images.map((card, i) => ({
       ...card,
       quantity: clampQty(card.quantity ?? 1),
       category: (card.category || 'Uncategorized').trim() || 'Uncategorized',
       backImg: card.backImg || null,
-      _idx: i
+      _idx: i,
+      _showBack: false
     }));
 
     renderOverviewGrid();
@@ -490,13 +497,7 @@ function openPrintView() {
           font-family: system-ui, Segoe UI, Roboto, Inter, Arial, sans-serif;
         }
         .sheet { position: absolute; }
-        .sheet .slot {
-          width: ${CONFIG.CARD_MM.W}mm;
-          height: ${CONFIG.CARD_MM.H}mm;
-          display: block;
-          position: relative;
-          overflow: hidden;
-        }
+        .sheet .slot { width: ${CONFIG.CARD_MM.W}mm; height: ${CONFIG.CARD_MM.H}mm; display: block; position: relative; overflow: hidden; }
         .sheet .slot img { width: 100%; height: 100%; object-fit: cover; display: block; }
       </style>
     </head>
@@ -613,7 +614,7 @@ function openPrintView() {
   win.document.close();
 }
 
-// =============== Preview Modal (click-to-zoom + quantity controls) ===============
+// =============== Preview Modal (click-to-zoom + qty + FLIP) ===============
 function openPreviewModal(index) {
   const card = cachedImages[index];
   if (!card) return;
@@ -627,14 +628,16 @@ function openPreviewModal(index) {
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
 
-  const qtyNow = clampQty(card.quantity);
+  // use current tile face state as starting point
+  let showingBack = !!card._showBack;
 
   overlay.innerHTML = `
     <div class="preview-card" role="document" aria-label="${escapeHTML(card.name ?? 'Card preview')}">
       <button class="preview-close" aria-label="Close">×</button>
 
       <div class="preview-image-wrap">
-        <img src="${card.img}" alt="${escapeHTML(card.name ?? 'Card')}" />
+        ${card.backImg ? `<button class="preview-flip" type="button" aria-label="Flip card face">Flip</button>` : ``}
+        <img src="${showingBack && card.backImg ? card.backImg : card.img}" alt="${escapeHTML(card.name ?? 'Card')}" />
       </div>
 
       <div class="preview-controls" data-index="${index}">
@@ -642,7 +645,7 @@ function openPreviewModal(index) {
         <button class="qty-btn step minus5"  aria-label="Decrease by 5">−5</button>
         <button class="qty-btn minus"        aria-label="Decrease by 1">−1</button>
 
-        <span class="qty-display" aria-live="polite">×${qtyNow}</span>
+        <span class="qty-display" aria-live="polite">×${clampQty(card.quantity)}</span>
 
         <button class="qty-btn plus"         aria-label="Increase by 1">+1</button>
         <button class="qty-btn step plus5"   aria-label="Increase by 5">+5</button>
@@ -651,13 +654,28 @@ function openPreviewModal(index) {
     </div>
   `;
 
-  // Close on backdrop click
+  // Close on backdrop
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closePreviewModal(overlay); });
   // Close on X
   overlay.querySelector('.preview-close')?.addEventListener('click', () => closePreviewModal(overlay));
-  // Close on ESC
+  // ESC
   const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); closePreviewModal(overlay); document.removeEventListener('keydown', onKey); } };
   document.addEventListener('keydown', onKey);
+
+  // Flip (modal)
+  overlay.querySelector('.preview-flip')?.addEventListener('click', () => {
+    if (!card.backImg) return;
+    showingBack = !showingBack;
+    card._showBack = showingBack; // sync to overview state
+    const imgEl = overlay.querySelector('.preview-image-wrap img');
+    if (imgEl) imgEl.src = showingBack ? card.backImg : card.img;
+
+    // also update the overview tile image immediately
+    const tileImg = document.querySelector(`.card[data-index="${index}"] img`);
+    if (tileImg) tileImg.src = showingBack ? card.backImg : card.img;
+    const tile = document.querySelector(`.card[data-index="${index}"]`);
+    tile?.classList.toggle('showing-back', showingBack);
+  });
 
   // Quantity buttons
   overlay.querySelector('.preview-controls')?.addEventListener('click', (e) => {

@@ -293,6 +293,33 @@ body::before{
   pointer-events: none;
 }
 
+/* DFC flip badge on tiles (top-left) */
+.flip-badge{
+  position:absolute;
+  top:6px;
+  left:6px;
+  z-index:2;
+
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+
+  min-width: 28px;
+  height: 22px;
+  padding: 0 10px;
+
+  border-radius: var(--radius-ssm);
+  border: 1px solid rgba(255,255,255,.18);
+  background: linear-gradient(180deg, var(--forest-500), var(--forest-700));
+  color: #fff;
+  font-weight: 800;
+  line-height: 1;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0,0,0,.18), inset 0 0 0 1px rgba(255,255,255,.08);
+}
+.flip-badge:hover{ filter: brightness(1.08); }
+
 /* Fade cards that are at ×0 (still clickable) */
 .card.is-zero{opacity:.45;filter: grayscale(.1)}
 .card.is-zero .qty-badge{opacity:.85}
@@ -370,6 +397,7 @@ body.modal-open { overflow: hidden; }
 
 /* Image area — neutral dark so the art pops */
 .preview-image-wrap{
+  position: relative; /* to position the flip button inside */
   width: 100%;
   aspect-ratio: 63 / 88;
   background: #0e1b15;
@@ -389,6 +417,34 @@ body.modal-open { overflow: hidden; }
   object-fit: contain;
   display: block;
 }
+
+/* Modal flip button (top-left of image) */
+.preview-flip{
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 5;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 28px;
+  height: 22px;
+  padding: 0 10px;
+
+  border-radius: var(--radius-ssm);
+  border: 1px solid rgba(255,255,255,.18);
+  background: linear-gradient(180deg, var(--forest-500), var(--forest-700));
+  color: #fff;
+  font-weight: 800;
+  line-height: 1;
+  font-size: 12px;
+  cursor: pointer;
+
+  box-shadow: 0 4px 10px rgba(0,0,0,.18), inset 0 0 0 1px rgba(255,255,255,.08);
+}
+.preview-flip:hover{ filter: brightness(1.08); }
 
 /* Quantity controls */
 .preview-controls{
