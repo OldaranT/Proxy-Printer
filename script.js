@@ -1,4 +1,3 @@
-
 // ---------- Tweakable constants ----------
 const CONFIG = {
   PAGE_SIZES_MM: { A4: { W: 210, H: 297 }, A3: { W: 297, H: 420 } },
@@ -24,9 +23,9 @@ const CONFIG = {
   BACK_FLIP_MODE: 'long',
 
   // --- Spinner animation assets (JSON + SVG icons) ---
-  ANIM_ICON_DIR: '/public/icons/animation/',                // folder where icons live
-  ANIM_ICON_MANIFEST: '/public/icons/animation/manifest.json', // JSON file with ["icon-animation-1.svg", ...]
-  LOADING_TEXT_URL: '/public/strings/loading.json',         // { quips: [...], hints: [...] }
+  ANIM_ICON_DIR: '/public/icons/animation/',                 // folder where icons live
+  ANIM_ICON_MANIFEST: '/public/icons/animation/manifest.json',// JSON ["icon-animation-1.svg", ...]
+  LOADING_TEXT_URL: '/public/strings/loading.json',          // { quips: [...], hints: [...] }
 
   // fallback if manifest can't be read:
   ANIM_FALLBACK_COUNT: 300,
@@ -55,7 +54,6 @@ function shuffle(arr) {
   return a;
 }
 function pathVariants(p) {
-  // Try common public/ vs root path variants automatically.
   const norm = String(p).replace(/^\.?\//, "");
   const noPublic = norm.replace(/^public\//, "");
   return [norm, "/" + norm, noPublic, "/" + noPublic];
@@ -99,7 +97,7 @@ const SpinnerAnimator = (() => {
   let quipEl = null;          // #loading .quip
   let hintEl = null;          // #loading .hint
 
-  // read theme colors from CSS vars (fallback to sane defaults)
+  // read theme colors
   function themePalette() {
     const cs = getComputedStyle(document.documentElement);
     const pick = (name, def) => (cs.getPropertyValue(name) || def).trim() || def;
@@ -109,17 +107,12 @@ const SpinnerAnimator = (() => {
     return [c400, c500, c600];
   }
 
-  // Normalize SVG to be colorable via currentColor, and wrap it
+  // make SVG colorable by currentColor
   function normalizeSVGColors(svgText) {
     try {
-      // Make fills/strokes inherit currentColor to allow dynamic theming
-      let t = svgText
+      return svgText
         .replace(/fill="[^"]*"/gi, 'fill="currentColor"')
         .replace(/stroke="[^"]*"/gi, 'stroke="currentColor"');
-
-      // Ensure an explicit width/height or viewBox is preserved; most already have it.
-      // Return sanitized text
-      return t;
     } catch {
       return svgText;
     }
@@ -129,7 +122,6 @@ const SpinnerAnimator = (() => {
     const el = document.getElementById('spinnerIcon');
     if (!el) return null;
     if (el.tagName.toLowerCase() === 'img') {
-      // Replace <img> with <div> so it doesn’t preload PNG and can host inline SVG
       const div = document.createElement('div');
       div.id = el.id;
       div.className = el.className || 'spinner-icon';
@@ -155,7 +147,6 @@ const SpinnerAnimator = (() => {
         if (typeof arr[0] === "string") {
           files = arr.filter(x => typeof x === "string" && /\.svg$/i.test(x));
         } else if (typeof arr[0] === "object" && arr[0]) {
-          // supports object-style manifests too (album/file/filename/name)
           files = arr
             .map(o => o.album || o.file || o.filename || o.name)
             .filter(v => typeof v === "string" && /\.svg$/i.test(v));
@@ -195,7 +186,6 @@ const SpinnerAnimator = (() => {
       hintPool = shuffle([...hints]);
       quipIndex = 0; hintIndex = 0;
 
-      // First draw immediately
       applyText();
     } catch(e) {
       console.warn("[strings] failed, using defaults:", e);
@@ -226,14 +216,12 @@ const SpinnerAnimator = (() => {
   async function swapIcon() {
     if (!icons.length || !iconHost) return;
 
-    // pick next icon URL (loop after shuffle)
     if (iconIndex === 0) {
-      icons = shuffle(icons); // reshuffle each cycle to keep it fresh
+      icons = shuffle(icons);
     }
     const url = icons[iconIndex % icons.length];
     iconIndex++;
 
-    // pick a theme color each time
     const palette = themePalette();
     const color = palette[(Math.random() * palette.length) | 0];
 
@@ -243,7 +231,6 @@ const SpinnerAnimator = (() => {
       let svgText = await res.text();
       svgText = normalizeSVGColors(svgText);
 
-      // mount inline SVG; color with currentColor via style
       iconHost.innerHTML = svgText;
       const svg = iconHost.querySelector('svg');
       if (svg) {
@@ -251,23 +238,20 @@ const SpinnerAnimator = (() => {
         svg.style.display = 'block';
         svg.style.width = '46px';
         svg.style.height = '46px';
-        svg.style.color = color;     // apply theme color
+        svg.style.color = color;
         svg.style.fill = 'currentColor';
         svg.style.stroke = 'currentColor';
       }
-      // spinner ring accent
       if (ringEl) {
         ringEl.style.borderTopColor = color;
       }
     } catch (e) {
       console.warn('[spinner] failed to load icon', url, e);
-      // leave whatever was there; ring stays the same color
     }
   }
 
   function tick() {
     swapIcon();
-    // advance text too
     quipIndex++;
     hintIndex++;
     applyText();
@@ -280,11 +264,9 @@ const SpinnerAnimator = (() => {
     hintEl = document.querySelector('#loading .spinner-copy .hint');
 
     await Promise.all([loadManifest(), loadStrings()]);
-    // immediate first paint
     await swapIcon();
     applyText();
 
-    // start rotation
     clearInterval(timer);
     timer = setInterval(tick, CONFIG.SPINNER_ROTATE_MS);
   }
@@ -308,7 +290,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Init the animated spinner (icons + text from JSON)
   SpinnerAnimator.init().catch(e => console.warn('Spinner init failed', e));
 });
 
@@ -368,7 +349,6 @@ function setCardQuantity(index, qty) {
   updateTotalsBar();
   updateCategoryCounts();
 
-  // sync modal if open
   const controls = document.querySelector('.preview-controls');
   const modalQty = document.querySelector('.preview-controls .qty-display');
   if (controls && Number(controls?.dataset.index) === index && modalQty) {
@@ -411,30 +391,30 @@ function countsForCategory(cards) {
   return { uniqueCount, copyCount };
 }
 
-// Font Awesome glyph helpers (will show as text if FA not loaded yet)
+// Font Awesome glyphs (shown via CSS ::before)
 const GLYPH = {
-  FLIP: "\uf021",
-  PLUS: "\uf067",
-  MINUS: "\uf068",
-  CLOSE: "\uf00d"
+  FLIP: "\uf021",   // refresh
+  PLUS: "\uf067",   // +
+  MINUS: "\uf068",  // −
+  CLOSE: "\uf00d"   // ×
 };
-function makeGlyphButton({ className, title, aria, glyph, sizePx=18 }) {
+
+// Render a single glyph via data-icon (prevents double text)
+function applyGlyph(el, glyph) {
+  if (!el) return el;
+  el.classList.add('icon-glyph');
+  el.textContent = '';
+  el.setAttribute('data-icon', glyph);
+  return el;
+}
+
+function makeGlyphButton({ className, title, aria, glyph }) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = className;
-  btn.title = title || '';
+  if (title) btn.title = title;
   if (aria) btn.setAttribute('aria-label', aria);
-  btn.textContent = glyph;
-  // nudge some inline styles so it looks decent even without FA CSS
-  btn.style.fontFamily = "var(--icon-font, 'Font Awesome 6 Free', 'Font Awesome 5 Free', system-ui, sans-serif)";
-  btn.style.fontWeight = '900';
-  btn.style.fontSize = '14px';
-  btn.style.lineHeight = '1';
-  btn.style.display = 'inline-flex';
-  btn.style.alignItems = 'center';
-  btn.style.justifyContent = 'center';
-  btn.style.minWidth = sizePx + 'px';
-  btn.style.minHeight = Math.round(sizePx * 0.9) + 'px';
+  applyGlyph(btn, glyph);
   return btn;
 }
 
@@ -450,23 +430,20 @@ function renderOverviewGrid() {
 
     const section = document.createElement('section');
     section.className = 'category-section';
-    section.dataset.category = category; // default OPEN
+    section.dataset.category = category;
 
     const header = document.createElement('div');
     header.className = 'category-title';
 
-    // left toggle area (keyboard accessible)
     const left = document.createElement('div');
     left.className = 'category-left';
     left.setAttribute('role', 'button');
     left.setAttribute('tabindex', '0');
     left.setAttribute('aria-expanded', 'true');
 
-    // indicator (minus by default, i.e., expanded)
     const indicator = document.createElement('span');
     indicator.className = 'category-indicator';
-    indicator.textContent = GLYPH.MINUS;
-    indicator.style.fontFamily = "var(--icon-font, 'Font Awesome 6 Free', 'Font Awesome 5 Free', system-ui, sans-serif')";
+    applyGlyph(indicator, GLYPH.MINUS); // expanded by default
 
     const nameEl = document.createElement('span');
     nameEl.className = 'category-name';
@@ -499,7 +476,6 @@ function renderOverviewGrid() {
       tile.dataset.index = String(i);
       if (card.backImg) tile.classList.add('has-back');
 
-      // init per-card face view (front by default)
       if (typeof card._showBack !== 'boolean') card._showBack = false;
 
       const qty = clampQty(card.quantity ?? 1);
@@ -509,19 +485,16 @@ function renderOverviewGrid() {
       img.src = card._showBack && card.backImg ? card.backImg : card.img;
       img.alt = card.name ?? 'Card';
 
-      // quantity badge (always visible)
       const badge = document.createElement('span');
       badge.className = 'qty-badge';
       badge.textContent = `×${qty}`;
 
-      // flip badge (DFC only) — glyph
       if (card.backImg) {
         const flip = makeGlyphButton({
           className: 'flip-badge',
           title: 'Flip card face',
           aria: `Flip ${card.name}`,
-          glyph: GLYPH.FLIP,
-          sizePx: 22
+          glyph: GLYPH.FLIP
         });
         flip.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -535,8 +508,6 @@ function renderOverviewGrid() {
       }
 
       applyZeroStateClass(tile, qty);
-
-      // Open modal on click
       tile.addEventListener('click', () => openPreviewModal(i));
 
       tile.appendChild(img);
@@ -547,12 +518,11 @@ function renderOverviewGrid() {
     section.appendChild(wrap);
     grid.appendChild(section);
 
-    // Collapsible behavior (default open)
     function toggleSection() {
       const isCollapsed = section.classList.toggle('collapsed');
       wrap.style.display = isCollapsed ? 'none' : '';
       left.setAttribute('aria-expanded', String(!isCollapsed));
-      indicator.textContent = isCollapsed ? GLYPH.PLUS : GLYPH.MINUS;
+      applyGlyph(indicator, isCollapsed ? GLYPH.PLUS : GLYPH.MINUS);
     }
     left.addEventListener('click', toggleSection);
     left.addEventListener('keydown', (e) => {
@@ -616,7 +586,6 @@ async function loadDeck() {
 
     categoryOrderFromServer = Array.isArray(data.categoryOrder) ? data.categoryOrder : [];
 
-    // keep category, quantities and DFC backImg; init face state
     cachedImages = data.images.map((card, i) => ({
       ...card,
       quantity: clampQty(card.quantity ?? 1),
@@ -702,7 +671,6 @@ function openPrintView() {
   const CANVAS_W_PX = Math.round((PAGE_W / MM_PER_IN) * CONFIG.CANVAS_DPI);
   const CANVAS_H_PX = Math.round((PAGE_H / MM_PER_IN) * CONFIG.CANVAS_DPI);
 
-  // Flatten to {front, back}; DFCs use backImg; singles use custom back
   const itemsAll = [];
   cachedImages.forEach(card => {
     const q = clampQty(card.quantity);
@@ -940,7 +908,6 @@ function openPreviewModal(index) {
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
 
-  // use current tile face state as starting point
   let showingBack = !!card._showBack;
 
   const flipBtnHTML = card.backImg
@@ -949,17 +916,15 @@ function openPreviewModal(index) {
           className: 'preview-flip',
           title: 'Flip card face',
           aria: 'Flip card face',
-          glyph: GLYPH.FLIP,
-          sizePx: 24
+          glyph: GLYPH.FLIP
         });
-        // we'll insert this element string by placeholder and then wire up after insert
         return btn.outerHTML;
       })()
     : '';
 
   overlay.innerHTML = `
     <div class="preview-card" role="document" aria-label="${escapeHTML(card.name ?? 'Card preview')}">
-      <button class="preview-close" aria-label="Close">${GLYPH.CLOSE}</button>
+      <button class="preview-close" aria-label="Close"></button>
 
       <div class="preview-image-wrap">
         ${flipBtnHTML}
@@ -980,22 +945,21 @@ function openPreviewModal(index) {
     </div>
   `;
 
+  // Close button glyph
+  const closeBtn = overlay.querySelector('.preview-close');
+  applyGlyph(closeBtn, GLYPH.CLOSE);
+
   // Close on backdrop
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closePreviewModal(overlay); });
   // Close on X
-  overlay.querySelector('.preview-close')?.addEventListener('click', () => closePreviewModal(overlay));
+  closeBtn?.addEventListener('click', () => closePreviewModal(overlay));
   // ESC
   const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); closePreviewModal(overlay); document.removeEventListener('keydown', onKey); } };
   document.addEventListener('keydown', onKey);
 
-  // Flip (modal) — attach handler if present
+  // Flip (modal)
   const flipBtn = overlay.querySelector('.preview-flip');
   if (flipBtn && card.backImg) {
-    // apply quick inline styles so glyph looks right
-    flipBtn.style.fontFamily = "var(--icon-font, 'Font Awesome 6 Free', 'Font Awesome 5 Free', system-ui, sans-serif)";
-    flipBtn.style.fontWeight = '900';
-    flipBtn.style.fontSize = '14px';
-
     flipBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       showingBack = !showingBack;
@@ -1003,7 +967,6 @@ function openPreviewModal(index) {
       const imgEl = overlay.querySelector('.preview-image-wrap img');
       if (imgEl) imgEl.src = showingBack ? card.backImg : card.img;
 
-      // also update the overview tile image immediately
       const tileImg = document.querySelector(`.card[data-index="${index}"] img`);
       if (tileImg) tileImg.src = showingBack ? card.backImg : card.img;
       const tile = document.querySelector(`.card[data-index="${index}"]`);
@@ -1039,7 +1002,7 @@ function openPreviewModal(index) {
   });
 
   document.body.appendChild(overlay);
-  overlay.querySelector('.preview-close')?.focus();
+  closeBtn?.focus();
 }
 function closePreviewModal(overlayEl) {
   try {
@@ -1047,4 +1010,3 @@ function closePreviewModal(overlayEl) {
     (overlayEl || document.getElementById('previewOverlay'))?.remove();
   } catch (_) {}
 }
-

@@ -11,6 +11,9 @@
   <link rel="icon" type="image/png" sizes="32x32" href="public/icons/ERIS-PROXIES-ICON.png">
   <!-- Preload the logo so it appears instantly -->
   <link rel="preload" as="image" href="public/icons/ERIS-PROXIES-ICON.png" />
+  <link rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+  crossorigin="anonymous" referrerpolicy="no-referrer">
 </head>
 <body>
   <div class="container">
@@ -96,7 +99,7 @@
     <div id="loading" class="hidden">
       <div class="spinner-wrapper">
         <div class="spinner-ring"></div>
-        <img id="spinnerIcon" class="spinner-icon" src="public/icons/FF-ICON-1.png" alt="Loading">
+        <div id="spinnerIcon" class="spinner-icon" aria-hidden="true"></div>
       </div>
 
       <div class="spinner-copy" role="status" aria-live="polite">

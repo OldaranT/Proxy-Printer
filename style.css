@@ -34,9 +34,6 @@
   --shadow-card:0 4px 14px rgba(0,0,0,.10);
   --glow-on:0 0 0 6px rgba(33,160,106,.22);
 
-  /* spinner accent (script updates this) */
-  --spinner-accent: var(--forest-500);
-
   /* Page background gradients as reusables */
   --bg-radial-1: radial-gradient(ellipse farthest-corner at 85% -10%,
                    rgba(33,160,106,.14) 0%, rgba(33,160,106,0) 60%);
@@ -47,15 +44,9 @@
 
   /* UI zoom */
   --ui-zoom: 1.25; /* ~125% */
-}
 
-/* ================= Load Font Awesome for icon codes ================= */
-@font-face{
-  font-family:"Font Awesome 6 Free";
-  font-style:normal;
-  font-weight:900;
-  font-display:swap;
-  src:url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/webfonts/fa-solid-900.woff2") format("woff2");
+  /* Icon font (used by .icon-glyph renderer) */
+  --icon-font: "Font Awesome 6 Free", "Font Awesome 5 Free", system-ui, sans-serif;
 }
 
 /* ================= Page Background (infinite) & Zoom ================= */
@@ -67,11 +58,21 @@ body{
   zoom: var(--ui-zoom);
 }
 @supports not (zoom: 1){
-  .container{ transform: scale(var(--ui-zoom)); transform-origin: top center; }
+  .container{
+    transform: scale(var(--ui-zoom));
+    transform-origin: top center;
+  }
 }
 body::before{
-  content:""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background: var(--bg-stack); background-repeat: no-repeat; background-size: cover; background-attachment: fixed;
+  content:"";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--bg-stack);
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-attachment: fixed;
 }
 
 /* ================= Container & Brand ================= */
@@ -84,9 +85,13 @@ body::before{
 }
 .brand-text{display:flex;flex-direction:column;gap:4px}
 .brand-title{
-  margin:0; font-size:36px; line-height:1.1; letter-spacing:.3px;
+  margin:0;
+  font-size:36px;
+  line-height:1.1;
+  letter-spacing:.3px;
   background:linear-gradient(90deg,var(--forest-700),var(--forest-400));
-  -webkit-background-clip:text;background-clip:text;color:transparent;
+  -webkit-background-clip:text;background-clip:text;
+  color:transparent;
   text-shadow:0 1px 0 rgba(255,255,255,.35);
 }
 .brand-sub{margin:0;color:#345348;font-weight:600;letter-spacing:.2px}
@@ -167,19 +172,13 @@ body::before{
 .spinner-wrapper{ position:relative; width:92px; height:92px; }
 .spinner-ring{
   position:absolute; inset:0; border-radius:50%;
-  border:6px solid #e6efe9; border-top-color: var(--spinner-accent);
+  border:6px solid #e6efe9; border-top-color: var(--forest-500);
   animation: spin 1s linear infinite;
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,.03), 0 2px 8px rgba(0,0,0,.06);
 }
 .spinner-icon{
-  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-  width:46px; height:46px;
-  display:flex; align-items:center; justify-content:center;
-  color: var(--spinner-accent); /* inline SVG uses currentColor */
+  position:absolute; width:46px; height:46px; /* inline SVG host */
+  left:50%; top:50%; transform:translate(-50%,-50%);
 }
-.spinner-icon img,
-.spinner-icon svg{ max-width:100%; max-height:100%; display:block; }
-
 @keyframes spin{ to{ transform: rotate(360deg) } }
 
 .spinner-copy{
@@ -239,11 +238,7 @@ body::before{
   background: linear-gradient(180deg, var(--forest-500), var(--forest-700));
   color:#fff;font-weight:900;border:1px solid rgba(255,255,255,.16);
   box-shadow:0 2px 8px rgba(0,0,0,.12), inset 0 0 0 1px rgba(255,255,255,.06);
-  font-family:"Font Awesome 6 Free"; font-weight:900;
 }
-.category-indicator::before{ content:"\f068"; } /* minus by default */
-.category-section.collapsed .category-indicator::before{ content:"\f067"; } /* plus when collapsed */
-
 .category-name{font-weight:900;color:#163b2e;letter-spacing:.2px}
 .category-meta{display:flex;gap:8px;align-items:center;font-weight:800}
 .category-uniques{color:#1f3f33;background:#eef6f1;border:1px solid #d6e8df;padding:4px 8px;border-radius:10px}
@@ -283,7 +278,7 @@ body::before{
   position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:1;
 }
 
-/* Quantity badge (always visible, supports multi-digit) */
+/* Quantity badge */
 .qty-badge{
   position:absolute;z-index:2;right:6px;bottom:6px;
   display:inline-flex;align-items:center;justify-content:center;
@@ -295,25 +290,17 @@ body::before{
   user-select:none;pointer-events:none;
 }
 
-/* DFC flip badges (tile + modal) use icon code \f021 */
-.flip-badge,
-.preview-flip{
-  position:absolute; z-index:2;
-  display:inline-flex; align-items:center; justify-content:center;
-  height:26px; padding:0 8px; border-radius:var(--radius-ssm);
+/* DFC flip badge on tiles (top-left) */
+.flip-badge{
+  position:absolute;top:6px;left:6px;z-index:2;
+  display:inline-flex;align-items:center;justify-content:center;
+  width:30px;height:26px;padding:0;border-radius:var(--radius-ssm);
   border:1px solid rgba(255,255,255,.18);
   background: linear-gradient(180deg, var(--forest-500), var(--forest-700));
-  color:#fff; font-weight:800; line-height:1; font-size:12px; cursor:pointer;
+  color: #fff; font-weight: 800; line-height: 1; font-size: 13px; cursor: pointer;
   box-shadow:0 4px 10px rgba(0,0,0,.18), inset 0 0 0 1px rgba(255,255,255,.08);
-  font-family:"Font Awesome 6 Free"; font-weight:900;
 }
-.flip-badge{ top:6px; left:6px; width:30px; }
-.flip-badge::before{ content:"\f021"; }
-.preview-flip{ top:8px; left:8px; height:30px; width:36px; font-size:13px; }
-.preview-flip::before{ content:"\f021"; }
-.flip-badge:hover,.preview-flip:hover{ filter: brightness(1.08); }
-@keyframes rotateOnce{ to{ transform: rotate(360deg); } }
-.flip-badge.spin::before,.preview-flip.spin::before{ animation: rotateOnce .45s ease; transform-origin:50% 50%; }
+.flip-badge:hover{ filter: brightness(1.08); }
 
 /* Fade cards that are at ×0 (still clickable) */
 .card.is-zero{opacity:.45;filter: grayscale(.1)}
@@ -349,7 +336,7 @@ body.modal-open { overflow: hidden; }
   max-width: min(90vw, 520px);
 }
 
-/* Close button uses \f00d */
+/* Close button */
 .preview-close{
   position: absolute; top: 8px; right: 8px; z-index: 3;
   display: inline-flex; align-items: center; justify-content: center;
@@ -358,9 +345,7 @@ body.modal-open { overflow: hidden; }
   background: linear-gradient(180deg, var(--forest-500), var(--forest-700));
   color: #fff; font-weight: 800; line-height: 1; font-size: 16px; cursor: pointer;
   box-shadow: 0 4px 10px rgba(0,0,0,.18), inset 0 0 0 1px rgba(255,255,255,.08);
-  font-family:"Font Awesome 6 Free"; font-weight:900;
 }
-.preview-close::before{ content:"\f00d"; }
 .preview-close:hover{ filter: brightness(1.08); }
 .preview-close:focus-visible{ outline: 3px solid var(--mint-200); outline-offset: 2px; }
 
@@ -373,6 +358,18 @@ body.modal-open { overflow: hidden; }
 }
 .preview-image-wrap img{ max-width:100%; max-height:100%; object-fit:contain; display:block }
 
+/* Modal flip button */
+.preview-flip{
+  position: absolute; top: 8px; left: 8px; z-index: 5;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 30px; padding: 0; border-radius: var(--radius-ssm);
+  border: 1px solid rgba(255,255,255,.18);
+  background: linear-gradient(180deg, var(--forest-500), var(--forest-700));
+  color: #fff; font-weight: 800; line-height: 1; font-size: 13px; cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0,0,0,.18), inset 0 0 0 1px rgba(255,255,255,.08);
+}
+.preview-flip:hover{ filter: brightness(1.08); }
+
 /* Quantity controls */
 .preview-controls{
   display: flex; align-items: center; justify-content: center;
@@ -380,15 +377,13 @@ body.modal-open { overflow: hidden; }
   background: rgba(255,255,255,.65); border: 1px solid rgba(0,0,0,.08);
   border-radius: 10px; padding: 10px;
 }
-
-/* Center the visible text (no pseudo). Works for "+", "−", "+5", "−10" equally. */
 .qty-btn{
   display:flex; align-items:center; justify-content:center;
   height: 36px; min-width: 44px; padding: 0 10px;
   border-radius: 8px; border: 1px solid rgba(255,255,255,.18); cursor: pointer;
   background: linear-gradient(180deg, var(--forest-500), var(--forest-600));
-  color: #fff;
-  font-weight: 900; font-size: 16px; line-height: 1; letter-spacing: .2px; font-variant-numeric: tabular-nums;
+  color: #fff; font-weight: 900; font-size: 16px; line-height: 1; letter-spacing: .2px;
+  font-variant-numeric: tabular-nums;
   box-shadow: 0 3px 10px rgba(0,0,0,.18);
   transition: filter .12s ease, transform .08s ease, box-shadow .12s ease;
 }
@@ -398,6 +393,43 @@ body.modal-open { overflow: hidden; }
 .qty-btn:focus-visible{ outline: 3px solid var(--mint-200); outline-offset: 2px; }
 
 .qty-display{
-  min-width: 76px; text-align: center; font-weight: 900; color: #0f1b14;
-  background: #e8f4ee; border-radius: 8px; padding: 6px 12px; border: 1px solid rgba(0,0,0,.08);
+  min-width: 76px;
+  text-align: center;
+  font-weight: 900;
+  color: #0f1b14;
+  background: #e8f4ee;
+  border-radius: 8px;
+  padding: 6px 12px;
+  border: 1px solid rgba(0,0,0,.08);
 }
+
+/* ================= Unified glyph renderer ================= */
+/* Put the FA codepoint in data-icon; render once via ::before */
+.icon-glyph{ position: relative; }
+.icon-glyph::before{
+  content: attr(data-icon);
+  font-family: var(--icon-font);
+  font-weight: 900;
+  line-height: 1;
+  display: inline-block;
+}
+
+/* Sizing tweaks for specific controls */
+.category-indicator.icon-glyph::before{ font-size: 13px; }
+.flip-badge.icon-glyph::before,
+.preview-flip.icon-glyph::before{ font-size: 14px; }
+.preview-close.icon-glyph::before{ font-size: 16px; }
+
+/* Spin animation for glyphs */
+@keyframes spinOnce{ to { transform: rotate(360deg); } }
+.flip-badge.spin::before,
+.preview-flip.spin::before{
+  animation: spinOnce .45s ease;
+  transform-origin: 50% 50%;
+}
+
+/* In case any old SVGs remain in DOM for these controls, hide them to prevent double icons */
+.flip-badge svg,
+.preview-flip svg,
+.category-indicator svg,
+.preview-close svg{ display:none !important; }
