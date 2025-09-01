@@ -20,16 +20,16 @@ const CONFIG = {
     COLOR: '#00ff00'
   },
 
-  // Back image source (your custom Eris Proxies back)
+  // Custom back for single-faced cards
   BACK_IMAGE_URL: 'https://cdn.imgchest.com/files/7kzcajvdwp7.png',
 
   CANVAS_DPI: 96,
 
   /**
    * How to flip backs so they align in duplex printing.
-   * - 'long'  : mirror horizontally (reverse columns) → most common (“Flip on long edge”)
-   * - 'short' : mirror vertically   (reverse rows)    → use if your printer flips on short edge
-   * - 'none'  : no mirroring (not recommended for duplex)
+   * - 'long'  : mirror horizontally (reverse columns) → “Flip on long edge”
+   * - 'short' : mirror vertically   (reverse rows)    → “Flip on short edge”
+   * - 'none'  : no mirroring
    */
   BACK_FLIP_MODE: 'long'
 };
@@ -122,8 +122,8 @@ function setCardQuantity(index, qty) {
   updateCategoryCounts();
 
   // keep modal display in sync if open
-  const modalQty = document.querySelector('.preview-controls .qty-display');
   const controls = document.querySelector('.preview-controls');
+  const modalQty = document.querySelector('.preview-controls .qty-display');
   if (controls && Number(controls?.dataset.index) === index && modalQty) {
     modalQty.textContent = `×${newQty}`;
   }
@@ -297,11 +297,12 @@ async function loadDeck() {
 
     categoryOrderFromServer = Array.isArray(data.categoryOrder) ? data.categoryOrder : [];
 
-    // keep category & clamp quantities
+    // keep category, quantities, and store backImg if present
     cachedImages = data.images.map((card, i) => ({
       ...card,
       quantity: clampQty(card.quantity ?? 1),
       category: (card.category || 'Uncategorized').trim() || 'Uncategorized',
+      backImg: card.backImg || null,
       _idx: i
     }));
 
@@ -340,34 +341,22 @@ function choosePageGeometry(sizeKey, gapmm) {
 }
 
 /**
- * Return an array of length perPage that mirrors the *positions* of the front chunk
- * to the back page, so each front aligns with its back after duplex printing.
- * - flip 'long'  : mirror horizontally (reverse columns)
- * - flip 'short' : mirror vertically   (reverse rows)
- * - flip 'none'  : 1:1 positions
+ * Map a front index k (0..cols*rows-1) to the slot index for the back page
+ * according to duplex flip mode.
  */
-function mapBackCells(frontChunkLength, cols, rows, flipMode) {
-  const perPage = cols * rows;
-  const cells = new Array(perPage).fill(null);
+function mapBackIndex(k, cols, rows, flipMode) {
+  const r = Math.floor(k / cols);
+  const c = k % cols;
+  let rr = r, cc = c;
 
-  for (let k = 0; k < frontChunkLength; k++) {
-    const r = Math.floor(k / cols);
-    const c = k % cols;
-
-    let rr = r, cc = c;
-    if (flipMode === 'long') {
-      // mirror across vertical axis (reverse columns)
-      cc = cols - 1 - c;
-    } else if (flipMode === 'short') {
-      // mirror across horizontal axis (reverse rows)
-      rr = rows - 1 - r;
-    } else {
-      // 'none' → leave rr, cc as-is
-    }
-    const idxBack = rr * cols + cc;
-    cells[idxBack] = CONFIG.BACK_IMAGE_URL;
+  if (flipMode === 'long') {
+    // Mirror horizontally (reverse columns)
+    cc = cols - 1 - c;
+  } else if (flipMode === 'short') {
+    // Mirror vertically (reverse rows)
+    rr = rows - 1 - r;
   }
-  return cells;
+  return rr * cols + cc;
 }
 
 // Build print pages COMPACTLY — categories do NOT influence layout
@@ -403,12 +392,15 @@ function openPrintView() {
   const CANVAS_W_PX = Math.round((PAGE_W / MM_PER_IN) * CONFIG.CANVAS_DPI);
   const CANVAS_H_PX = Math.round((PAGE_H / MM_PER_IN) * CONFIG.CANVAS_DPI);
 
-  // Flatten all cards with qty > 0, in their current deck order
-  const imgsAll = [];
+  // Flatten all selected items with their corresponding backs
+  const itemsAll = [];
   cachedImages.forEach(card => {
     const q = clampQty(card.quantity);
     if (q > 0) {
-      for (let i = 0; i < q; i++) imgsAll.push(card.img);
+      const backSrc = card.backImg || CONFIG.BACK_IMAGE_URL;
+      for (let i = 0; i < q; i++) {
+        itemsAll.push({ front: card.img, back: backSrc });
+      }
     }
   });
 
@@ -427,28 +419,27 @@ function openPrintView() {
 
   const win = window.open('', '_blank');
 
-  // Build a full grid of slots (perPage) from an array of image URLs (<= perPage)
-  function buildSlotsHTML(srcArray, perPage) {
+  function buildFrontSlotsHTML(items, perPage) {
     const slots = new Array(perPage).fill(null);
-    for (let i = 0; i < Math.min(srcArray.length, perPage); i++) {
-      slots[i] = srcArray[i];
+    for (let i = 0; i < Math.min(items.length, perPage); i++) {
+      slots[i] = items[i].front;
     }
-    return slots.map(src => {
-      if (src) {
-        return `<div class="slot"><img src="${src}" alt="Card" /></div>`;
-      }
-      return `<div class="slot empty"></div>`;
-    }).join('');
+    return slots.map(src => src
+      ? `<div class="slot"><img src="${src}" alt="Card front" /></div>`
+      : `<div class="slot empty"></div>`
+    ).join('');
   }
 
-  function buildBackSlotsHTML(frontCount) {
-    const backCells = mapBackCells(frontCount, GRID_COLS, GRID_ROWS, CONFIG.BACK_FLIP_MODE);
-    return backCells.map(src => {
-      if (src) {
-        return `<div class="slot"><img src="${src}" alt="Card back" /></div>`;
-      }
-      return `<div class="slot empty"></div>`;
-    }).join('');
+  function buildBackSlotsHTML(items, perPage) {
+    const slots = new Array(perPage).fill(null);
+    for (let k = 0; k < Math.min(items.length, perPage); k++) {
+      const idxBack = mapBackIndex(k, GRID_COLS, GRID_ROWS, CONFIG.BACK_FLIP_MODE);
+      slots[idxBack] = items[k].back; // DFC uses real back; single-face uses custom back
+    }
+    return slots.map(src => src
+      ? `<div class="slot"><img src="${src}" alt="Card back" /></div>`
+      : `<div class="slot empty"></div>`
+    ).join('');
   }
 
   function buildPageHTML(slotsHTML, isBack = false) {
@@ -481,13 +472,14 @@ function openPrintView() {
 
   // Build compact pages (fronts + aligned backs)
   const pages = [];
-  for (let i = 0; i < imgsAll.length; i += perPage) {
-    const chunk = imgsAll.slice(i, i + perPage);          // fronts on this page
-    const frontSlots = buildSlotsHTML(chunk, perPage);     // create perPage slots, extras empty
+  for (let i = 0; i < itemsAll.length; i += perPage) {
+    const chunkItems = itemsAll.slice(i, i + perPage);
+
+    const frontSlots = buildFrontSlotsHTML(chunkItems, perPage);
     pages.push(buildPageHTML(frontSlots, false));
 
     if (addBackground) {
-      const backSlots = buildBackSlotsHTML(chunk.length);  // mirror only the count present on the front
+      const backSlots = buildBackSlotsHTML(chunkItems, perPage);
       pages.push(buildPageHTML(backSlots, true));
     }
   }
@@ -653,10 +645,10 @@ function openPreviewModal(index) {
   overlay.setAttribute('aria-modal', 'true');
 
   overlay.innerHTML = `
-    <div class="preview-card" role="document" aria-label="${card.name ?? 'Card preview'}">
+    <div class="preview-card" role="document" aria-label="\${card.name ?? 'Card preview'}">
       <button class="preview-close" aria-label="Close">×</button>
       <div class="preview-image-wrap">
-        <img src="${card.img}" alt="${card.name ?? 'Card'}">
+        <img src="\${card.img}" alt="\${card.name ?? 'Card'}">
       </div>
       <div class="preview-controls" data-index="${index}">
         <button class="qty-btn step minus10" aria-label="Decrease by 10">−10</button>
