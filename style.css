@@ -207,6 +207,7 @@ body::before{
 .categories-wrap{display:block}
 .category-section{margin-top:18px}
 
+/* Clickable header for collapse/expand */
 .category-title{
   display:flex;align-items:center;justify-content:space-between;gap:10px;
   padding:10px 12px;
@@ -215,7 +216,22 @@ body::before{
   border-left:4px solid var(--forest-500);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card);
+  user-select:none;
 }
+.category-left{
+  display:flex;align-items:center;gap:8px;
+  cursor:pointer;
+}
+.category-left:focus-visible{ outline:3px solid var(--mint-200); outline-offset:2px; border-radius:8px; }
+
+.category-indicator{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:22px;height:22px;border-radius:6px;
+  background: linear-gradient(180deg, var(--forest-500), var(--forest-700));
+  color:#fff;font-weight:900;border:1px solid rgba(255,255,255,.16);
+  box-shadow:0 2px 8px rgba(0,0,0,.12), inset 0 0 0 1px rgba(255,255,255,.06);
+}
+
 .category-name{font-weight:900;color:#163b2e;letter-spacing:.2px}
 .category-meta{display:flex;gap:8px;align-items:center;font-weight:800}
 .category-uniques{
@@ -236,6 +252,9 @@ body::before{
   margin-top:10px;
   overflow:visible;
 }
+
+/* collapsed state */
+.category-section.collapsed .category-grid{ display:none; }
 
 /* ================= Card tiles ================= */
 .card-grid .card,
@@ -293,7 +312,7 @@ body::before{
   pointer-events: none;
 }
 
-/* DFC flip badge on tiles (top-left) */
+/* DFC flip badge on tiles (top-left) — icon button */
 .flip-badge{
   position:absolute;
   top:6px;
@@ -304,9 +323,9 @@ body::before{
   align-items:center;
   justify-content:center;
 
-  min-width: 28px;
+  width: 26px;
   height: 22px;
-  padding: 0 10px;
+  padding: 0;
 
   border-radius: var(--radius-ssm);
   border: 1px solid rgba(255,255,255,.18);
@@ -318,7 +337,13 @@ body::before{
   cursor: pointer;
   box-shadow: 0 4px 10px rgba(0,0,0,.18), inset 0 0 0 1px rgba(255,255,255,.08);
 }
+.flip-badge svg{ display:block; width:16px; height:16px; }
 .flip-badge:hover{ filter: brightness(1.08); }
+
+/* spin animation on click */
+@keyframes spinOnce{ to { transform: rotate(360deg); } }
+.flip-badge.spin svg,
+.preview-flip.spin svg{ animation: spinOnce .45s ease; transform-origin: 50% 50%; }
 
 /* Fade cards that are at ×0 (still clickable) */
 .card.is-zero{opacity:.45;filter: grayscale(.1)}
@@ -333,7 +358,7 @@ body::before{
   overflow:visible;
 }
 
-/* ===== Modal preview — full styles ===== */
+/* ===== Modal preview ===== */
 
 body.modal-open { overflow: hidden; }
 
@@ -395,9 +420,9 @@ body.modal-open { overflow: hidden; }
 .preview-close:hover{ filter: brightness(1.08); }
 .preview-close:focus-visible{ outline: 3px solid var(--mint-200); outline-offset: 2px; }
 
-/* Image area — neutral dark so the art pops */
+/* Image area */
 .preview-image-wrap{
-  position: relative; /* to position the flip button inside */
+  position: relative;
   width: 100%;
   aspect-ratio: 63 / 88;
   background: #0e1b15;
@@ -429,9 +454,9 @@ body.modal-open { overflow: hidden; }
   align-items: center;
   justify-content: center;
 
-  min-width: 28px;
+  width: 28px;
   height: 22px;
-  padding: 0 10px;
+  padding: 0;
 
   border-radius: var(--radius-ssm);
   border: 1px solid rgba(255,255,255,.18);
@@ -444,6 +469,7 @@ body.modal-open { overflow: hidden; }
 
   box-shadow: 0 4px 10px rgba(0,0,0,.18), inset 0 0 0 1px rgba(255,255,255,.08);
 }
+.preview-flip svg{ display:block; width:16px; height:16px; }
 .preview-flip:hover{ filter: brightness(1.08); }
 
 /* Quantity controls */

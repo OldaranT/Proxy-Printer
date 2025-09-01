@@ -1,3 +1,5 @@
+// script.js
+
 // ---------- Tweakable constants ----------
 const CONFIG = {
   PAGE_SIZES_MM: { A4: { W: 210, H: 297 }, A3: { W: 297, H: 420 } },
@@ -15,7 +17,7 @@ const CONFIG = {
   CANVAS_DPI: 96,
 
   /**
-   * Duplex flip mode:
+   * Duplex flip mode for backs:
    * 'long'  → mirror columns (flip on long edge)
    * 'short' → mirror rows   (flip on short edge)
    * 'none'  → no mirroring
@@ -155,6 +157,15 @@ function countsForCategory(cards) {
   return { uniqueCount, copyCount };
 }
 
+// Small inline SVG (two circular arrows)
+function flipIconSVG() {
+  return `
+<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+  <path d="M12 3a7 7 0 0 1 6.32 4H20a1 1 0 1 1 0 2h-4a1 1 0 0 1-1-1V4a1 1 0 1 1 2 0v1.03A9 9 0 1 0 12 21a1 1 0 1 1 0-2 7 7 0 1 1 0-14Z" fill="currentColor" opacity=".85"/>
+  <path d="M12 21a7 7 0 0 1-6.32-4H4a1 1 0 1 1 0-2h4a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0v-1.03A9 9 0 1 0 12 3a1 1 0 1 1 0 2 7 7 0 1 1 0 16Z" fill="currentColor"/>
+</svg>`;
+}
+
 // =============== Overview (categories) ===============
 function renderOverviewGrid() {
   const grid = document.getElementById('cardGrid');
@@ -168,12 +179,15 @@ function renderOverviewGrid() {
 
     const section = document.createElement('section');
     section.className = 'category-section';
-    section.dataset.category = category;
+    section.dataset.category = category; // default OPEN
 
     const header = document.createElement('div');
     header.className = 'category-title';
     header.innerHTML = `
-      <span class="category-name">${escapeHTML(category)}</span>
+      <div class="category-left" role="button" tabindex="0" aria-expanded="true" aria-controls="">
+        <span class="category-indicator" aria-hidden="true">–</span>
+        <span class="category-name">${escapeHTML(category)}</span>
+      </div>
       <span class="category-meta">
         <span class="category-uniques" title="Unique cards">${uniqueCount} unique</span>
         <span class="category-count" title="Total copies to print">${copyCount}</span>
@@ -183,6 +197,10 @@ function renderOverviewGrid() {
 
     const wrap = document.createElement('div');
     wrap.className = 'category-grid';
+    // give the title a target id reference for a11y
+    const wrapId = `cat_${Math.random().toString(36).slice(2)}`;
+    wrap.id = wrapId;
+    header.querySelector('.category-left')?.setAttribute('aria-controls', wrapId);
 
     cards.forEach(card => {
       const i = card._idx;
@@ -201,24 +219,27 @@ function renderOverviewGrid() {
       img.src = card._showBack && card.backImg ? card.backImg : card.img;
       img.alt = card.name ?? 'Card';
 
-      // quantity badge (always visible, multi-digit supported)
+      // quantity badge (always visible)
       const badge = document.createElement('span');
       badge.className = 'qty-badge';
       badge.textContent = `×${qty}`;
 
-      // flip badge (DFC only)
+      // flip badge (DFC only) — icon
       if (card.backImg) {
         const flip = document.createElement('button');
         flip.type = 'button';
         flip.className = 'flip-badge';
         flip.title = 'Flip card face';
         flip.setAttribute('aria-label', `Flip ${card.name}`);
-        flip.textContent = 'Flip';
+        flip.innerHTML = flipIconSVG();
         flip.addEventListener('click', (e) => {
           e.stopPropagation();
           card._showBack = !card._showBack;
           img.src = card._showBack ? card.backImg : card.img;
           tile.classList.toggle('showing-back', !!card._showBack);
+          // spin animation
+          flip.classList.add('spin');
+          setTimeout(() => flip.classList.remove('spin'), 500);
         });
         tile.appendChild(flip);
       }
@@ -235,6 +256,25 @@ function renderOverviewGrid() {
 
     section.appendChild(wrap);
     grid.appendChild(section);
+
+    // Collapsible behavior (default open)
+    const left = header.querySelector('.category-left');
+    const indicator = header.querySelector('.category-indicator');
+
+    function toggleSection() {
+      const isCollapsed = section.classList.toggle('collapsed');
+      wrap.style.display = isCollapsed ? 'none' : '';
+      left.setAttribute('aria-expanded', String(!isCollapsed));
+      indicator.textContent = isCollapsed ? '+' : '–';
+    }
+
+    left.addEventListener('click', toggleSection);
+    left.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggleSection();
+      }
+    });
   });
 }
 
@@ -636,7 +676,7 @@ function openPreviewModal(index) {
       <button class="preview-close" aria-label="Close">×</button>
 
       <div class="preview-image-wrap">
-        ${card.backImg ? `<button class="preview-flip" type="button" aria-label="Flip card face">Flip</button>` : ``}
+        ${card.backImg ? `<button class="preview-flip" type="button" aria-label="Flip card face">${flipIconSVG()}</button>` : ``}
         <img src="${showingBack && card.backImg ? card.backImg : card.img}" alt="${escapeHTML(card.name ?? 'Card')}" />
       </div>
 
@@ -663,8 +703,9 @@ function openPreviewModal(index) {
   document.addEventListener('keydown', onKey);
 
   // Flip (modal)
-  overlay.querySelector('.preview-flip')?.addEventListener('click', () => {
+  overlay.querySelector('.preview-flip')?.addEventListener('click', (e) => {
     if (!card.backImg) return;
+    e.stopPropagation();
     showingBack = !showingBack;
     card._showBack = showingBack; // sync to overview state
     const imgEl = overlay.querySelector('.preview-image-wrap img');
@@ -675,6 +716,10 @@ function openPreviewModal(index) {
     if (tileImg) tileImg.src = showingBack ? card.backImg : card.img;
     const tile = document.querySelector(`.card[data-index="${index}"]`);
     tile?.classList.toggle('showing-back', showingBack);
+
+    const btn = overlay.querySelector('.preview-flip');
+    btn?.classList.add('spin');
+    setTimeout(() => btn?.classList.remove('spin'), 500);
   });
 
   // Quantity buttons
