@@ -456,7 +456,6 @@ body.modal-open { overflow: hidden; }
 
 /* ================= Unified glyph renderer ================= */
 /* Put the FA codepoint in data-icon; render once via ::before */
-.icon-glyph{ position: relative; }
 .icon-glyph::before{
   content: attr(data-icon);
   font-family: var(--icon-font);
