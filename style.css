@@ -66,6 +66,11 @@ body{
   }
 }
 
+/* Disable global zoom on small screens for clarity */
+@media (max-width: 900px){
+  :root{ --ui-zoom: 1; }
+}
+
 body::before{
   content:"";
   position: fixed;
@@ -261,6 +266,14 @@ body::before{
 }
 .category-section.collapsed .category-grid{ display:none; }
 
+/* Mobile: smaller tiles for better overview */
+@media (max-width: 560px){
+  .category-grid{
+    grid-template-columns:repeat(auto-fill, minmax(104px,1fr));
+    gap:10px;
+  }
+}
+
 /* ================= Card tiles ================= */
 .card-grid .card,
 .category-grid .card{
@@ -305,6 +318,16 @@ body::before{
 }
 .flip-badge:hover{ filter: brightness(1.08); }
 
+/* Smaller badges/buttons on phones */
+@media (max-width: 560px){
+  .qty-badge{
+    min-width:24px;height:20px;padding:0 8px;font-size:11px;right:4px;bottom:4px;
+  }
+  .flip-badge{
+    width:28px;height:24px;font-size:12px;top:4px;left:4px;
+  }
+}
+
 /* Fade cards that are at ×0 (still clickable) */
 .card.is-zero{opacity:.45;filter: grayscale(.1)}
 .card.is-zero .qty-badge{opacity:.85}
@@ -339,11 +362,11 @@ body.modal-open { overflow: hidden; }
   max-width: min(90vw, 520px);
 }
 
-/* Close button (X) — top-right of modal card */
+/* Close button (X) — top-right of modal card, above everything */
 .preview-close{
-  position: absolute; top: 8px; right: 8px; left: auto !important; z-index: 30;
+  position: absolute; top: 8px !important; right: 8px !important; left: auto !important; z-index: 40;
   display: inline-flex; align-items: center; justify-content: center;
-  min-width: 36px; height: 30px; padding: 0 12px; border-radius: var(--radius-ssm);
+  width: 36px; height: 30px; padding: 0; border-radius: var(--radius-ssm);
   border: 1px solid rgba(255,255,255,.18);
   background: linear-gradient(180deg, var(--forest-500), var(--forest-700));
   color: #fff; font-weight: 800; line-height: 1; font-size: 16px; cursor: pointer;
@@ -364,7 +387,7 @@ body.modal-open { overflow: hidden; }
 
 /* Modal flip button — top-left inside the image area */
 .preview-flip{
-  position: absolute; top: 8px; left: 8px; right: auto !important; z-index: 20;
+  position: absolute; top: 8px !important; left: 8px !important; right: auto !important; z-index: 30;
   display: inline-flex; align-items: center; justify-content: center;
   width: 36px; height: 30px; padding: 0; border-radius: var(--radius-ssm);
   border: 1px solid rgba(255,255,255,.18);
@@ -407,6 +430,30 @@ body.modal-open { overflow: hidden; }
   border: 1px solid rgba(0,0,0,.08);
 }
 
+/* Condense modal controls on smaller screens */
+@media (max-width: 560px){
+  .preview-controls{
+    gap: 6px;
+    padding: 8px;
+  }
+  .qty-btn{
+    height: 32px;
+    min-width: 38px;
+    padding: 0 8px;
+    font-size: 14px;
+    border-radius: 7px;
+  }
+  .qty-btn.step{
+    min-width: 44px;
+    padding: 0 6px;
+  }
+  .qty-display{
+    min-width: 64px;
+    padding: 4px 10px;
+    font-size: 14px;
+  }
+}
+
 /* ================= Unified glyph renderer ================= */
 /* Put the FA codepoint in data-icon; render once via ::before */
 .icon-glyph{ position: relative; }
@@ -423,6 +470,12 @@ body.modal-open { overflow: hidden; }
 .flip-badge.icon-glyph::before,
 .preview-flip.icon-glyph::before{ font-size: 14px; }
 .preview-close.icon-glyph::before{ font-size: 16px; }
+
+@media (max-width: 560px){
+  .category-indicator.icon-glyph::before{ font-size: 12px; }
+  .preview-close.icon-glyph::before{ font-size: 15px; }
+  .preview-flip.icon-glyph::before{ font-size: 13px; }
+}
 
 /* Spin animation for glyphs */
 @keyframes spinOnce{ to { transform: rotate(360deg); } }
