@@ -2,33 +2,38 @@
 
 // ---------- Tweakable constants ----------
 const CONFIG = {
-  PAGE_SIZES_MM: {
-    A4: { W: 210, H: 297 },
-    A3: { W: 297, H: 420 }
-  },
-  DEFAULT_PAGE: 'A4',
+  // Supported page sizes (portrait dimensions, in mm)
+  PAGE_SIZES_MM: { A4: { W: 210, H: 297 }, A3: { W: 297, H: 420 } },
+  DEFAULT_PAGE: 'A4',                   // used when pageSize toggle is OFF
+
+  // Auto orientation picks portrait/landscape to maximize #cards per page.
+  // Options: 'auto' | 'portrait' | 'landscape'
   ORIENTATION_MODE: 'auto',
 
+  // Card geometry (mm)
   CARD_MM: { W: 63, H: 88 },
 
+  // Spacing between cards when enabled (mm)
   GAP_WHEN_ENABLED_MM: 6,
 
+  // Cutline (corner crop marks) styling
   CUTLINE: {
-    OFFSET_FROM_EDGE_MM: 0.5,
-    LENGTH_MM: 2,
-    STROKE_PX: 1.2,
-    COLOR: '#00ff00'
+    OFFSET_FROM_EDGE_MM: 0.5,          // gap from card edge to start of crop mark
+    LENGTH_MM: 2,                       // crop mark line length
+    STROKE_PX: 1.2,                     // stroke width (canvas pixels)
+    COLOR: '#00ff00'                    // crop mark color
   },
 
-  // Custom back for single-faced cards
+  // Back image for single-faced cards
   BACK_IMAGE_URL: 'https://cdn.imgchest.com/files/7kzcajvdwp7.png',
 
+  // Canvas pixel density for cutline/background canvases
   CANVAS_DPI: 96,
 
   /**
-   * Duplex flip mode for back-page mirroring
-   * 'long'  → reverse columns (Flip on long edge)
-   * 'short' → reverse rows   (Flip on short edge)
+   * Duplex flip mode for the backs page
+   * 'long'  → reverse columns (flip on long edge)
+   * 'short' → reverse rows   (flip on short edge)
    * 'none'  → no mirroring
    */
   BACK_FLIP_MODE: 'long'
@@ -39,6 +44,7 @@ let cachedImages = [];
 let cachedDeckName = "Deck";
 let categoryOrderFromServer = [];
 
+// =============== Boot ===============
 document.addEventListener('DOMContentLoaded', () => {
   ensureTotalsBar();
 
@@ -58,8 +64,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // =============== Totals Bar (UI) ===============
 function ensureTotalsBar() {
   if (document.getElementById('totalsBar')) return;
-
   const toggles = document.querySelector('.toggles');
+
   const bar = document.createElement('div');
   bar.id = 'totalsBar';
   bar.className = 'totals-bar';
@@ -68,11 +74,9 @@ function ensureTotalsBar() {
     <span class="value" id="totalCount">0</span>
     <span class="muted">(<span id="zeroCount">0</span> at ×0)</span>
   `;
-  if (toggles && toggles.parentElement) {
-    toggles.insertAdjacentElement('afterend', bar);
-  } else {
-    document.querySelector('.container')?.prepend(bar);
-  }
+  if (toggles && toggles.parentElement) toggles.insertAdjacentElement('afterend', bar);
+  else document.querySelector('.container')?.prepend(bar);
+
   updateTotalsBar();
 }
 
@@ -129,9 +133,7 @@ function setCardQuantity(index, qty) {
   }
 }
 
-function extractDeckUrl(url) {
-  return url.trim();
-}
+function extractDeckUrl(url) { return url.trim(); }
 
 // Group by category, preserving server order when provided
 function groupByCategory(cards) {
@@ -169,10 +171,9 @@ function countsForCategory(cards) {
   return { uniqueCount, copyCount };
 }
 
-// Render overview: label → cards → label → cards
+// Render overview: label → cards; categories DO NOT affect printing layout
 function renderOverviewGrid() {
   const grid = document.getElementById('cardGrid');
-
   grid.className = 'categories-wrap';
   grid.innerHTML = '';
 
@@ -218,7 +219,7 @@ function renderOverviewGrid() {
 
       applyZeroStateClass(tile, qty);
 
-      // CLICK opens modal
+      // Open modal on click
       tile.addEventListener('click', () => openPreviewModal(i));
 
       tile.appendChild(img);
@@ -291,9 +292,7 @@ async function loadDeck() {
     const res = await fetch(`https://mtg-proxy-api-server.onrender.com/api/deck?url=${encodeURIComponent(deckUrl)}`);
     const data = await res.json();
 
-    if (!data.images || data.images.length === 0) {
-      throw new Error("No images returned.");
-    }
+    if (!data.images || data.images.length === 0) throw new Error("No images returned.");
 
     categoryOrderFromServer = Array.isArray(data.categoryOrder) ? data.categoryOrder : [];
 
@@ -345,11 +344,9 @@ function mapBackIndex(k, cols, rows, flipMode) {
   const c = k % cols;
   let rr = r, cc = c;
 
-  if (flipMode === 'long') {
-    cc = cols - 1 - c;
-  } else if (flipMode === 'short') {
-    rr = rows - 1 - r;
-  }
+  if (flipMode === 'long')      cc = cols - 1 - c; // mirror columns
+  else if (flipMode === 'short') rr = rows - 1 - r; // mirror rows
+
   return rr * cols + cc;
 }
 
@@ -386,7 +383,7 @@ function openPrintView() {
   const CANVAS_W_PX = Math.round((PAGE_W / MM_PER_IN) * CONFIG.CANVAS_DPI);
   const CANVAS_H_PX = Math.round((PAGE_H / MM_PER_IN) * CONFIG.CANVAS_DPI);
 
-  // Flatten to {front, back} items; DFCs use backImg; singles use custom back
+  // Flatten to {front, back}; DFCs use backImg; singles use custom back
   const itemsAll = [];
   cachedImages.forEach(card => {
     const q = clampQty(card.quantity);
@@ -500,12 +497,7 @@ function openPrintView() {
           position: relative;
           overflow: hidden;
         }
-        .sheet .slot img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          display: block;
-        }
+        .sheet .slot img { width: 100%; height: 100%; object-fit: cover; display: block; }
       </style>
     </head>
     <body>
@@ -621,7 +613,7 @@ function openPrintView() {
   win.document.close();
 }
 
-// =============== Preview Modal (click-to-zoom with quantity controls) ===============
+// =============== Preview Modal (click-to-zoom + quantity controls) ===============
 function openPreviewModal(index) {
   const card = cachedImages[index];
   if (!card) return;
@@ -635,18 +627,23 @@ function openPreviewModal(index) {
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
 
-  // IMPORTANT: no escaped ${...} — let the values render.
+  const qtyNow = clampQty(card.quantity);
+
   overlay.innerHTML = `
-    <div class="preview-card" role="document" aria-label="${card.name ?? 'Card preview'}">
+    <div class="preview-card" role="document" aria-label="${escapeHTML(card.name ?? 'Card preview')}">
       <button class="preview-close" aria-label="Close">×</button>
+
       <div class="preview-image-wrap">
-        <img src="${card.img}" alt="${card.name ?? 'Card'}">
+        <img src="${card.img}" alt="${escapeHTML(card.name ?? 'Card')}" />
       </div>
+
       <div class="preview-controls" data-index="${index}">
         <button class="qty-btn step minus10" aria-label="Decrease by 10">−10</button>
         <button class="qty-btn step minus5"  aria-label="Decrease by 5">−5</button>
         <button class="qty-btn minus"        aria-label="Decrease by 1">−1</button>
-        <span class="qty-display" aria-live="polite">×${clampQty(card.quantity)}</span>
+
+        <span class="qty-display" aria-live="polite">×${qtyNow}</span>
+
         <button class="qty-btn plus"         aria-label="Increase by 1">+1</button>
         <button class="qty-btn step plus5"   aria-label="Increase by 5">+5</button>
         <button class="qty-btn step plus10"  aria-label="Increase by 10">+10</button>
@@ -654,20 +651,22 @@ function openPreviewModal(index) {
     </div>
   `;
 
-  // Close on outside click
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) closePreviewModal(); });
+  // Close on backdrop click
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closePreviewModal(overlay); });
   // Close on X
-  overlay.querySelector('.preview-close').addEventListener('click', closePreviewModal);
+  overlay.querySelector('.preview-close')?.addEventListener('click', () => closePreviewModal(overlay));
   // Close on ESC
-  const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); closePreviewModal(); } };
-  document.addEventListener('keydown', onKey, { once: true });
+  const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); closePreviewModal(overlay); document.removeEventListener('keydown', onKey); } };
+  document.addEventListener('keydown', onKey);
 
   // Quantity buttons
-  const controls = overlay.querySelector('.preview-controls');
-  controls.addEventListener('click', (e) => {
+  overlay.querySelector('.preview-controls')?.addEventListener('click', (e) => {
     const btn = e.target.closest('.qty-btn');
     if (!btn) return;
-    const idx = Number(controls.dataset.index);
+
+    const idx = Number(overlay.querySelector('.preview-controls')?.dataset.index || -1);
+    if (idx < 0) return;
+
     const current = clampQty(cachedImages[idx]?.quantity ?? 0);
     let delta = 0;
     if (btn.classList.contains('minus10')) delta = -10;
@@ -679,16 +678,20 @@ function openPreviewModal(index) {
 
     const next = Math.max(0, current + delta);
     setCardQuantity(idx, next);
+
+    const disp = overlay.querySelector('.qty-display');
+    if (disp) disp.textContent = `×${next}`;
   });
 
   document.body.appendChild(overlay);
-  overlay.querySelector('.preview-close').focus();
+  overlay.querySelector('.preview-close')?.focus();
+}
 
-  function closePreviewModal() {
+function closePreviewModal(overlayEl) {
+  try {
     document.body.classList.remove('modal-open');
-    overlay.remove();
-    document.removeEventListener('keydown', onKey, { once: true });
-  }
+    (overlayEl || document.getElementById('previewOverlay'))?.remove();
+  } catch (_) {}
 }
 
 // ================= Spinner icon + rotating messages =================
@@ -712,12 +715,8 @@ const hints = [
 function updateLoadingCopy(index) {
   const quipEl = document.querySelector('#loading .spinner-copy .quip');
   const hintEl = document.querySelector('#loading .spinner-copy .hint');
-  if (quipEl) {
-    quipEl.innerHTML = `${quips[index % quips.length]} <span class="dots"><span>•</span><span>•</span><span>•</span></span>`;
-  }
-  if (hintEl) {
-    hintEl.textContent = hints[index % hints.length];
-  }
+  if (quipEl) quipEl.innerHTML = `${quips[index % quips.length]} <span class="dots"><span>•</span><span>•</span><span>•</span></span>`;
+  if (hintEl) hintEl.textContent = hints[index % hints.length];
 }
 
 let currentIconIndex = 0;
