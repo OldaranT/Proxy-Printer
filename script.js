@@ -20,10 +20,18 @@ const CONFIG = {
     COLOR: '#00ff00'
   },
 
-  // Back image source
+  // Back image source (your custom Eris Proxies back)
   BACK_IMAGE_URL: 'https://cdn.imgchest.com/files/7kzcajvdwp7.png',
 
-  CANVAS_DPI: 96
+  CANVAS_DPI: 96,
+
+  /**
+   * How to flip backs so they align in duplex printing.
+   * - 'long'  : mirror horizontally (reverse columns) → most common (“Flip on long edge”)
+   * - 'short' : mirror vertically   (reverse rows)    → use if your printer flips on short edge
+   * - 'none'  : no mirroring (not recommended for duplex)
+   */
+  BACK_FLIP_MODE: 'long'
 };
 // ----------------------------------------
 
@@ -331,6 +339,37 @@ function choosePageGeometry(sizeKey, gapmm) {
   return (b.cols * b.rows) > (a.cols * a.rows) ? landscape : portrait;
 }
 
+/**
+ * Return an array of length perPage that mirrors the *positions* of the front chunk
+ * to the back page, so each front aligns with its back after duplex printing.
+ * - flip 'long'  : mirror horizontally (reverse columns)
+ * - flip 'short' : mirror vertically   (reverse rows)
+ * - flip 'none'  : 1:1 positions
+ */
+function mapBackCells(frontChunkLength, cols, rows, flipMode) {
+  const perPage = cols * rows;
+  const cells = new Array(perPage).fill(null);
+
+  for (let k = 0; k < frontChunkLength; k++) {
+    const r = Math.floor(k / cols);
+    const c = k % cols;
+
+    let rr = r, cc = c;
+    if (flipMode === 'long') {
+      // mirror across vertical axis (reverse columns)
+      cc = cols - 1 - c;
+    } else if (flipMode === 'short') {
+      // mirror across horizontal axis (reverse rows)
+      rr = rows - 1 - r;
+    } else {
+      // 'none' → leave rr, cc as-is
+    }
+    const idxBack = rr * cols + cc;
+    cells[idxBack] = CONFIG.BACK_IMAGE_URL;
+  }
+  return cells;
+}
+
 // Build print pages COMPACTLY — categories do NOT influence layout
 function openPrintView() {
   if (!cachedImages.length) return;
@@ -381,17 +420,38 @@ function openPrintView() {
     `${perPage}/page`,
     showCutlines ? '(cutlines)' : '(no cutlines)',
     addSpaceBetween ? `(${GAP}mm gaps)` : '(tight)',
-    addBackground ? '(with backs)' : '',
+    addBackground ? '(backs aligned)' : '',
     useBlackBg ? '(black page bg panel)' : ''
   ].filter(Boolean);
   const title = titleBits.join(' ');
 
   const win = window.open('', '_blank');
 
-  function buildPageHTML(imgSrcs, isBack = false) {
-    const imgs = isBack ? new Array(perPage).fill(CONFIG.BACK_IMAGE_URL) : imgSrcs;
-    const imagesHTML = imgs.map(src => `<img src="${src}" alt="${isBack ? 'Card back' : 'Card front'}" />`).join('');
+  // Build a full grid of slots (perPage) from an array of image URLs (<= perPage)
+  function buildSlotsHTML(srcArray, perPage) {
+    const slots = new Array(perPage).fill(null);
+    for (let i = 0; i < Math.min(srcArray.length, perPage); i++) {
+      slots[i] = srcArray[i];
+    }
+    return slots.map(src => {
+      if (src) {
+        return `<div class="slot"><img src="${src}" alt="Card" /></div>`;
+      }
+      return `<div class="slot empty"></div>`;
+    }).join('');
+  }
 
+  function buildBackSlotsHTML(frontCount) {
+    const backCells = mapBackCells(frontCount, GRID_COLS, GRID_ROWS, CONFIG.BACK_FLIP_MODE);
+    return backCells.map(src => {
+      if (src) {
+        return `<div class="slot"><img src="${src}" alt="Card back" /></div>`;
+      }
+      return `<div class="slot empty"></div>`;
+    }).join('');
+  }
+
+  function buildPageHTML(slotsHTML, isBack = false) {
     return `
       <div class="page ${isBack ? 'back' : 'front'}">
         <canvas class="page-fill" width="${CANVAS_W_PX}" height="${CANVAS_H_PX}"
@@ -408,7 +468,7 @@ function openPrintView() {
           grid-template-rows: repeat(${GRID_ROWS}, ${CARD_H}mm);
           gap:${GAP}mm;
           z-index:10;">
-          ${imagesHTML}
+          ${slotsHTML}
         </div>
 
         <div class="cutlines" style="position:absolute; inset:0; z-index:20; pointer-events:none; display:${showCutlines ? 'block' : 'none'};">
@@ -419,12 +479,17 @@ function openPrintView() {
     `;
   }
 
-  // Build compact pages (fronts + optional backs)
+  // Build compact pages (fronts + aligned backs)
   const pages = [];
   for (let i = 0; i < imgsAll.length; i += perPage) {
-    const chunk = imgsAll.slice(i, i + perPage);
-    pages.push(buildPageHTML(chunk, false));
-    if (addBackground) pages.push(buildPageHTML(chunk, true));
+    const chunk = imgsAll.slice(i, i + perPage);          // fronts on this page
+    const frontSlots = buildSlotsHTML(chunk, perPage);     // create perPage slots, extras empty
+    pages.push(buildPageHTML(frontSlots, false));
+
+    if (addBackground) {
+      const backSlots = buildBackSlotsHTML(chunk.length);  // mirror only the count present on the front
+      pages.push(buildPageHTML(backSlots, true));
+    }
   }
 
   const html = `
@@ -445,9 +510,16 @@ function openPrintView() {
           font-family: system-ui, Segoe UI, Roboto, Inter, Arial, sans-serif;
         }
         .sheet { position: absolute; }
-        .sheet img {
+        .sheet .slot {
           width: ${CONFIG.CARD_MM.W}mm;
           height: ${CONFIG.CARD_MM.H}mm;
+          display: block;
+          position: relative;
+          overflow: hidden;
+        }
+        .sheet .slot img {
+          width: 100%;
+          height: 100%;
           object-fit: cover;
           display: block;
         }
