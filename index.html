@@ -18,6 +18,18 @@
 <body>
   <div class="container">
     <header class="brand">
+      <!-- Top-right Build Deck button -->
+      <a
+        class="archidekt-cta"
+        href="https://archidekt.com"
+        target="_blank" rel="noopener noreferrer"
+        aria-label="Build Deck on Archidekt"
+      >
+        <span>Build Deck</span>
+        <img src="https://archidekt.com/images/logo.svg" alt="" class="archi-icon" width="20" height="20">
+        <img src="https://archidekt.com/images/archidekt2.svg" alt="Archidekt" class="archi-word" height="20" width="110">
+      </a>
+
       <div class="brand-row">
         <!-- 🔰 Logo before the title -->
         <img
@@ -40,6 +52,7 @@
       <div class="actions">
         <button id="loadBtn" class="btn sm" onclick="loadDeck()">Load from Archidekt</button>
         <button id="printBtn" class="btn sm" onclick="openPrintView()" disabled>Open Print Sheet</button>
+        <!-- (Archidekt button moved to header top-right) -->
       </div>
     </div>
 

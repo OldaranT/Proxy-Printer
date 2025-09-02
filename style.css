@@ -59,34 +59,21 @@ body{
   /* primary zoom (Chromium) */
   zoom: var(--ui-zoom);
 }
-/* fallback zoom for browsers without `zoom` support */
 @supports not (zoom: 1){
-  .container{
-    transform: scale(var(--ui-zoom));
-    transform-origin: top center;
-  }
+  .container{ transform: scale(var(--ui-zoom)); transform-origin: top center; }
 }
-
-/* Disable global zoom on small screens for clarity */
-@media (max-width: 900px){
-  :root{ --ui-zoom: 1; }
-}
+@media (max-width: 900px){ :root{ --ui-zoom: 1; } }
 
 body::before{
   content:"";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background: var(--bg-stack);
-  background-repeat: no-repeat;
-  background-size: cover;
-  background-attachment: fixed;
+  background-repeat: no-repeat; background-size: cover; background-attachment: fixed;
 }
 
 /* ================= Container & Brand ================= */
 .container{max-width:1440px;margin:36px auto 40px;padding:0 16px;}
-.brand{margin-bottom:16px}
+.brand{margin-bottom:16px; position:relative;} /* position for top-right CTA */
 .brand-row{display:flex;align-items:center;gap:12px}
 .brand-logo{
   width:56px;height:56px;object-fit:contain;border:0;border-radius:50%;background:transparent;
@@ -94,13 +81,9 @@ body::before{
 }
 .brand-text{display:flex;flex-direction:column;gap:4px}
 .brand-title{
-  margin:0;
-  font-size:36px;
-  line-height:1.1;
-  letter-spacing:.3px;
+  margin:0; font-size:36px; line-height:1.1; letter-spacing:.3px;
   background:linear-gradient(90deg,var(--forest-700),var(--forest-400));
-  -webkit-background-clip:text;background-clip:text;
-  color:transparent;
+  -webkit-background-clip:text; background-clip:text; color:transparent;
   text-shadow:0 1px 0 rgba(255,255,255,.35);
 }
 .brand-sub{margin:0;color:#345348;font-weight:600;letter-spacing:.2px}
@@ -128,6 +111,9 @@ body::before{
 .btn:active{transform: translateY(0)}
 .btn:disabled{opacity:.6;cursor:not-allowed}
 .btn:focus-visible{outline:3px solid var(--mint-200); outline-offset:2px}
+
+/* Small icon inside a .btn */
+.btn .btn-icon{ display:inline-block; width:18px; height:18px; margin-right:8px; vertical-align:middle; }
 
 /* ================= Toggles ================= */
 .toggles{
@@ -185,8 +171,7 @@ body::before{
   animation: spin 1s linear infinite;
 }
 .spinner-icon{
-  position:absolute; width:46px; height:46px; /* inline SVG host */
-  left:50%; top:50%; transform:translate(-50%,-50%);
+  position:absolute; width:46px; height:46px; left:50%; top:50%; transform:translate(-50%,-50%);
 }
 @keyframes spin{ to{ transform: rotate(360deg) } }
 
@@ -228,7 +213,6 @@ body::before{
 /* ================= Category overview ================= */
 .categories-wrap{display:block}
 .category-section{margin-top:18px}
-
 .category-title{
   display:flex;align-items:center;justify-content:space-between;gap:10px;
   padding:10px 12px;
@@ -263,16 +247,11 @@ body::before{
   grid-template-columns:repeat(auto-fill, minmax(140px,1fr));
   gap:12px;
   margin-top:10px;
-  overflow:visible;
 }
 .category-section.collapsed .category-grid{ display:none; }
 
-/* Mobile: smaller tiles for better overview */
 @media (max-width: 560px){
-  .category-grid{
-    grid-template-columns:repeat(auto-fill, minmax(104px,1fr));
-    gap:10px;
-  }
+  .category-grid{ grid-template-columns:repeat(auto-fill, minmax(104px,1fr)); gap:10px; }
 }
 
 /* ================= Card tiles ================= */
@@ -304,7 +283,6 @@ body::before{
   background: linear-gradient(180deg, var(--forest-500), var(--forest-700));
   border: 1px solid rgba(255,255,255,.18);
   box-shadow:0 4px 10px rgba(0,0,0,.18), inset 0 0 0 1px rgba(255,255,255,.08);
-  user-select:none;pointer-events:none;
 }
 
 /* DFC flip badge on tiles (top-left) */
@@ -319,14 +297,9 @@ body::before{
 }
 .flip-badge:hover{ filter: brightness(1.08); }
 
-/* Smaller badges/buttons on phones */
 @media (max-width: 560px){
-  .qty-badge{
-    min-width:24px;height:20px;padding:0 8px;font-size:11px;right:4px;bottom:4px;
-  }
-  .flip-badge{
-    width:28px;height:24px;font-size:12px;top:4px;left:4px;
-  }
+  .qty-badge{ min-width:24px;height:20px;padding:0 8px;font-size:11px;right:4px;bottom:4px; }
+  .flip-badge{ width:28px;height:24px;font-size:12px;top:4px;left:4px; }
 }
 
 /* Fade cards that are at ×0 (still clickable) */
@@ -334,10 +307,7 @@ body::before{
 .card.is-zero .qty-badge{opacity:.85}
 
 /* Legacy hook */
-.card-grid{
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
-  gap:12px;margin-top:14px;overflow:visible;
-}
+.card-grid{ display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px;margin-top:14px; }
 
 /* ===== Modal preview ===== */
 body.modal-open { overflow: hidden; }
@@ -363,7 +333,7 @@ body.modal-open { overflow: hidden; }
   max-width: min(90vw, 520px);
 }
 
-/* Close button (X) — ORIGINAL placement: top-right inside the modal card */
+/* Close button */
 .preview-close{
   position: absolute; top: 8px; right: 8px; z-index: 3;
   display: inline-flex; align-items: center; justify-content: center;
@@ -386,7 +356,7 @@ body.modal-open { overflow: hidden; }
 }
 .preview-image-wrap img{ max-width:100%; max-height:100%; object-fit:contain; display:block }
 
-/* Modal flip button — ORIGINAL placement: top-left inside the image area */
+/* Modal flip button */
 .preview-flip{
   position: absolute; top: 8px; left: 8px; z-index: 5;
   display: inline-flex; align-items: center; justify-content: center;
@@ -406,62 +376,31 @@ body.modal-open { overflow: hidden; }
   border-radius: 10px; padding: 10px;
 }
 
-/* Center the visible text (no pseudo). Works for "+", "−", "+5", "−10" equally. */
+/* Qty buttons */
 .qty-btn{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-
-  height: 36px;
-  min-width: 44px;
-  padding: 0 10px;
-
-  border-radius: 8px;
-  border: 1px solid rgba(255,255,255,.18);
-  cursor: pointer;
-
+  display:flex; align-items:center; justify-content:center;
+  height: 36px; min-width: 44px; padding: 0 10px;
+  border-radius: 8px; border: 1px solid rgba(255,255,255,.18); cursor: pointer;
   background: linear-gradient(180deg, var(--forest-500), var(--forest-600));
-  color: #fff;
-
-  font-weight: 900;
-  font-size: 16px;
-  line-height: 1; /* prevents baseline drift */
-  letter-spacing: .2px;
+  color: #fff; font-weight: 900; font-size: 16px; line-height: 1; letter-spacing: .2px;
   font-variant-numeric: tabular-nums;
-
   box-shadow: 0 3px 10px rgba(0,0,0,.18);
   transition: filter .12s ease, transform .08s ease, box-shadow .12s ease;
 }
-.qty-btn.step{ min-width: 56px; padding: 0 8px; } /* slimmer to stay on one line */
+.qty-btn.step{ min-width: 56px; padding: 0 8px; }
 .qty-btn:hover{ filter: brightness(1.08); box-shadow: 0 6px 16px rgba(0,0,0,.24); transform: translateY(-1px); }
 .qty-btn:active{ transform: translateY(0); }
 .qty-btn:focus-visible{ outline: 3px solid var(--mint-200); outline-offset: 2px; }
 
 .qty-display{
-  min-width: 76px;
-  text-align: center;
-  font-weight: 900;
-  color: #0f1b14;
-  background: #e8f4ee;
-  border-radius: 8px;
-  padding: 6px 12px;
-  border: 1px solid rgba(0,0,0,.08);
+  min-width: 76px; text-align: center; font-weight: 900; color: #0f1b14;
+  background: #e8f4ee; border-radius: 8px; padding: 6px 12px; border: 1px solid rgba(0,0,0,.08);
 }
 
 /* ================= Unified glyph renderer ================= */
-/* We render FA codepoints via ::before. DO NOT set position here. */
-.icon-glyph::before{
-  content: attr(data-icon);
-  font-family: var(--icon-font);
-  font-weight: 900;
-  line-height: 1;
-  display: inline-block;
-}
-
-/* Sizing tweaks for specific controls */
+.icon-glyph::before{ content: attr(data-icon); font-family: var(--icon-font); font-weight: 900; line-height: 1; display: inline-block; }
 .category-indicator.icon-glyph::before{ font-size: 13px; }
-.flip-badge.icon-glyph::before,
-.preview-flip.icon-glyph::before{ font-size: 14px; }
+.flip-badge.icon-glyph::before, .preview-flip.icon-glyph::before{ font-size: 14px; }
 .preview-close.icon-glyph::before{ font-size: 16px; }
 
 @media (max-width: 560px){
@@ -470,61 +409,44 @@ body.modal-open { overflow: hidden; }
   .preview-flip.icon-glyph::before{ font-size: 13px; }
 }
 
-/* Spin animation for glyphs */
 @keyframes spinOnce{ to { transform: rotate(360deg); } }
-.flip-badge.spin::before,
-.preview-flip.spin::before{
-  animation: spinOnce .45s ease;
-  transform-origin: 50% 50%;
-}
+.flip-badge.spin::before, .preview-flip.spin::before{ animation: spinOnce .45s ease; transform-origin: 50% 50%; }
 
-/* Prevent any old inline SVGs from doubling icons */
-.flip-badge svg,
-.preview-flip svg,
-.category-indicator svg,
-.preview-close svg{ display:none !important; }
+.flip-badge svg, .preview-flip svg, .category-indicator svg, .preview-close svg{ display:none !important; }
 
 /* ================= Mobile compact layout (phones) ================= */
 @media (max-width: 520px){
-  /* page & brand */
   .container{ margin:12px auto 20px; padding:0 10px; }
   .brand-row{ gap:8px; }
   .brand-logo{ width:44px; height:44px; }
   .brand-title{ font-size:24px; letter-spacing:.2px; }
   .brand-sub{ font-size:12px; }
 
-  /* input + buttons */
   .input-group{ gap:8px; }
   .input-group input{ height:40px; font-size:13px; padding:0 12px; }
   .btn{ height:38px; padding:0 12px; font-size:13px; border-radius:6px; }
   .btn.sm{ height:34px; }
 
-  /* toggles */
   .toggles{ gap:10px; margin:12px 0 6px; }
   .toggle{ padding:8px 10px; border-radius:6px; }
   .toggle .state{ font-size:12px; }
 
-  /* switches */
   .switch{ width:54px; height:28px; }
   .switch .track{ border-radius:12px; }
   .switch .thumb{ width:20px; height:20px; left:4px; }
   .switch input:checked + .track .thumb{ left: calc(100% - 4px - 20px); }
 
-  /* totals bar */
   .totals-bar{ padding:8px 10px; margin:10px 0 2px; }
   .totals-bar .value{ font-size:16px; padding:1px 8px; }
 
-  /* category header */
   .category-title{ padding:8px 10px; }
   .category-uniques{ padding:3px 6px; font-size:12px; }
   .category-count{ padding:3px 8px; font-size:12px; }
 
-  /* card grid & badges */
   .category-grid{ grid-template-columns:repeat(auto-fill, minmax(96px,1fr)); gap:8px; }
   .qty-badge{ min-width:24px; height:20px; padding:0 8px; font-size:11px; right:4px; bottom:4px; }
   .flip-badge{ width:28px; height:24px; font-size:12px; top:4px; left:4px; }
 
-  /* modal */
   .preview-card{ padding:12px; max-width:min(96vw, 480px); }
   .preview-image-wrap{ border-radius:8px; margin-bottom:10px; }
   .preview-close{ top:8px; right:8px; min-width:32px; height:28px; }
@@ -535,33 +457,36 @@ body.modal-open { overflow: hidden; }
   .qty-display{ min-width:62px; padding:4px 8px; font-size:14px; }
 }
 
-/* (Optional) extra-tight for very small devices) */
 @media (max-width: 380px){
   .btn{ height:36px; font-size:12px; }
   .toggle .state{ font-size:11.5px; }
   .category-grid{ grid-template-columns:repeat(auto-fill, minmax(92px,1fr)); gap:6px; }
 }
 
-/* ===== Mobile: extra-compact qty buttons (narrower) ===== */
+/* ===== Mobile: extra-compact qty buttons ===== */
 @media (max-width: 520px){
-  .preview-controls{
-    gap:4px;
-    padding:8px 8px 10px;
-  }
-  .qty-btn{
-    height:30px;
-    min-width:30px;
-    padding:0 6px;
-    font-size:13px;
-    border-radius:7px;
-  }
-  .qty-btn.step{
-    min-width:36px;
-    padding:0 6px;
-  }
-  .qty-display{
-    min-width:56px;
-    padding:3px 8px;
-    font-size:13px;
-  }
+  .preview-controls{ gap:4px; padding:8px 8px 10px; }
+  .qty-btn{ height:30px; min-width:30px; padding:0 6px; font-size:13px; border-radius:7px; }
+  .qty-btn.step{ min-width:36px; padding:0 6px; }
+  .qty-display{ min-width:56px; padding:3px 8px; font-size:13px; }
+}
+
+/* ======= Archidekt top-right CTA ======= */
+.archidekt-cta{
+  position:absolute; right:0; top:0;
+  display:inline-flex; align-items:center; gap:10px;
+  height:40px; padding:0 12px;
+  border-radius:var(--radius-ssm); text-decoration:none;
+  background: linear-gradient(180deg,var(--forest-600),var(--forest-700));
+  color:#fff; font-weight:800; letter-spacing:.2px;
+  box-shadow: var(--shadow-soft);
+}
+.archidekt-cta:hover{ transform: translateY(-1px); background:linear-gradient(180deg,var(--forest-500),var(--forest-600)); box-shadow: var(--shadow-strong); }
+.archidekt-cta:active{ transform: translateY(0); }
+.archidekt-cta:focus-visible{ outline:3px solid var(--mint-200); outline-offset:2px; }
+.archidekt-cta img{ display:block; }
+.archidekt-cta .archi-icon{ width:20px; height:20px; }
+.archidekt-cta .archi-word{ height:20px; width:auto; }
+@media (max-width: 700px){
+  .archidekt-cta .archi-word{ display:none; } /* keep it tidy on small screens */
 }
